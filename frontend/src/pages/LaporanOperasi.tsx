@@ -412,7 +412,24 @@ export default function LaporanOperasi() {
       const detail = await getOperasiDetail(no_rawat);
       setEditingModal(detail);
       const f: any = {};
-      Object.keys(detail).forEach((k) => { f[k] = detail[k] ?? ""; });
+      Object.keys(detail).forEach((k) => {
+        const val = detail[k];
+        if ((k === "tanggal" || k === "selesaioperasi") && val) {
+          const d = new Date(val);
+          if (!isNaN(d.getTime())) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, "0");
+            const day = String(d.getDate()).padStart(2, "0");
+            const hh = String(d.getHours()).padStart(2, "0");
+            const mm = String(d.getMinutes()).padStart(2, "0");
+            const ss = String(d.getSeconds()).padStart(2, "0");
+            const hasTime = val.includes("T") && (d.getHours() || d.getMinutes() || d.getSeconds());
+            f[k] = hasTime ? `${y}-${m}-${day}T${hh}:${mm}:${ss}` : `${y}-${m}-${day}`;
+            return;
+          }
+        }
+        f[k] = val ?? "";
+      });
       setEditModalForm(f);
     } catch {
       alert("Gagal memuat data laporan operasi");
@@ -423,7 +440,10 @@ export default function LaporanOperasi() {
     setSavingEdit(true);
     setNotif(null);
     try {
-      await updateOperasi(editingModal.no_rawat, editModalForm);
+      const fields = ["no_rawat","tanggal","diagnosa_preop","diagnosa_postop","jaringan_dieksekusi","selesaioperasi","permintaan_pa","nomor_implan","laporan_operasi"];
+      const payload: any = {};
+      fields.forEach((f) => { payload[f] = editModalForm[f] ?? ""; });
+      await updateOperasi(editingModal.no_rawat, payload);
       setEditingModal(null);
       loadList();
       loadOperasiStats({ tgl_from: tglFrom || undefined, tgl_to: tglTo || undefined, pj: pjFilter || undefined });

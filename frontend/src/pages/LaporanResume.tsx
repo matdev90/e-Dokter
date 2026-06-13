@@ -102,7 +102,22 @@ export default function LaporanResume() {
       const detail = await getResumeDetail(no_rawat);
       setEditing(detail);
       const f: any = {};
-      Object.keys(detail).forEach((k) => { f[k] = detail[k] ?? ""; });
+      Object.keys(detail).forEach((k) => {
+        const val = detail[k];
+        if (k === "kontrol" && val) {
+          const d = new Date(val);
+          if (!isNaN(d.getTime())) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, "0");
+            const day = String(d.getDate()).padStart(2, "0");
+            const hh = String(d.getHours()).padStart(2, "0");
+            const mm = String(d.getMinutes()).padStart(2, "0");
+            f[k] = `${y}-${m}-${day} ${hh}:${mm}:00`;
+            return;
+          }
+        }
+        f[k] = val ?? "";
+      });
       setEditForm(f);
     } catch {
       setNotif({ type: "error", message: "Gagal memuat data resume" });

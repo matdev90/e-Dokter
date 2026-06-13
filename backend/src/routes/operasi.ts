@@ -690,7 +690,7 @@ router.post("/", authenticate, authorize("doctor"), async (req: AuthRequest, res
         const jml = parseFloat(obat.jumlah) || 0;
         if (jml > 0 && obat.kd_obat) {
           await conn.execute(
-            `INSERT INTO beri_obat_operasi (no_rawat, tgl_operasi, kd_obat, harga_satuan, jumlah) VALUES (?, ?, ?, ?, ?)`,
+            `INSERT INTO beri_obat_operasi (no_rawat, tanggal, kd_obat, harga_satuan, jumlah) VALUES (?, ?, ?, ?, ?)`,
             [no_rawat, tanggal, obat.kd_obat, obat.harga_satuan || 0, jml]
           );
         }
@@ -910,7 +910,7 @@ router.put("/:no_rawat", authenticate, authorize("doctor"), async (req: AuthRequ
 
       // Update medications: delete existing then re-insert
       await conn.execute(
-        `DELETE FROM beri_obat_operasi WHERE no_rawat = ? AND tgl_operasi = ?`,
+        `DELETE FROM beri_obat_operasi WHERE no_rawat = ? AND tanggal = ?`,
         [no_rawat, tanggal]
       );
       const obatList: any[] = req.body.obat || [];
@@ -918,7 +918,7 @@ router.put("/:no_rawat", authenticate, authorize("doctor"), async (req: AuthRequ
         const jml = parseFloat(obat.jumlah) || 0;
         if (jml > 0 && obat.kd_obat) {
           await conn.execute(
-            `INSERT INTO beri_obat_operasi (no_rawat, tgl_operasi, kd_obat, harga_satuan, jumlah) VALUES (?, ?, ?, ?, ?)`,
+            `INSERT INTO beri_obat_operasi (no_rawat, tanggal, kd_obat, harga_satuan, jumlah) VALUES (?, ?, ?, ?, ?)`,
             [no_rawat, tanggal, obat.kd_obat, obat.harga_satuan || 0, jml]
           );
         }
@@ -1097,7 +1097,7 @@ router.delete("/:no_rawat", authenticate, authorize("doctor"), async (req: AuthR
     const lapData = (lapRows as any[])[0];
     if (lapData) {
       await conn.execute(`DELETE FROM laporan_operasi WHERE no_rawat = ? AND tanggal = ?`, [no_rawat, lapData.tanggal]);
-      await conn.execute(`DELETE FROM beri_obat_operasi WHERE no_rawat = ? AND tgl_operasi = ?`, [no_rawat, lapData.tanggal]);
+      await conn.execute(`DELETE FROM beri_obat_operasi WHERE no_rawat = ? AND tanggal = ?`, [no_rawat, lapData.tanggal]);
       await conn.execute(`DELETE FROM operasi WHERE no_rawat = ? AND tgl_operasi = ?`, [no_rawat, lapData.tanggal]);
     }
     await conn.commit();
