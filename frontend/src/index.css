@@ -1078,8 +1078,8 @@ tr { transition: background .1s; }
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border-radius: 24px;
-  padding: 2.5rem;
-  width: 100%; max-width: 420px;
+  padding: 3rem;
+  width: 100%; max-width: 800px;
   box-shadow:
     0 8px 48px rgba(0,0,0,0.4),
     inset 0 1px 0 rgba(255,255,255,0.08);
@@ -1263,8 +1263,8 @@ tr { transition: background .1s; }
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 14px;
-  padding: 0.85rem 1rem;
-  font-size: 0.9rem;
+  padding: 1rem 1.2rem;
+  font-size: 1rem;
   color: #fff;
   outline: none;
   transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
@@ -1313,8 +1313,8 @@ tr { transition: background .1s; }
   background: linear-gradient(135deg, #3b82f6, #6366f1, #8b5cf6);
   background-size: 200% 200%;
   border: none; border-radius: 14px;
-  padding: 0.9rem 1rem;
-  font-size: 0.95rem; font-weight: 600; color: #fff;
+  padding: 1rem 1.2rem;
+  font-size: 1.05rem; font-weight: 600; color: #fff;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.3s ease;
   margin-top: 0.5rem;
