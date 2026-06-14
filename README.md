@@ -37,16 +37,20 @@ git clone https://github.com/matdev90/e-Dokter.git
 cd e-Dokter
 ```
 
-### 2. Backend
+### 2. Backend (API + Frontend)
+
+Backend otomatis menyajikan frontend yang sudah di-build. Cukup jalankan satu server:
 
 ```bash
 cd backend
 cp .env.example .env   # sesuaikan konfigurasi database
 npm install
-npm run dev            # http://localhost:4000
+npm run dev            # http://localhost:4000 (API + Frontend)
 ```
 
-### 3. Frontend
+### 3. Frontend (Development Mode — Opsional)
+
+Jalankan terpisah jika ingin mengembangkan frontend dengan HMR:
 
 ```bash
 cd frontend
@@ -58,7 +62,7 @@ npm run dev            # http://localhost:5173
 
 ```bash
 cd frontend
-npm run build          # output di frontend/dist/
+npm run build          # output di frontend/dist/ (otomatis disajikan oleh backend)
 ```
 
 ### 5. Deployment (Production)
@@ -70,8 +74,7 @@ bash deploy.sh
 ```
 
 Script akan:
-- Install dependencies
-- Build frontend
+- Install dependencies & build frontend
 - Setup systemd service (`e-dokter.service`)
 - Konfigurasi Apache reverse proxy
 - Verifikasi deployment
@@ -154,6 +157,8 @@ e-dokter/
 │   │   ├── services/api.ts       # Axios + API functions
 │   │   └── index.css             # Global styles
 │   └── package.json
+├── package.json                  # Root package
+├── src/server.ts                 # Health check server
 ├── deploy.sh                     # Script deployment
 ├── panduan.md                    # Panduan penggunaan
 └── README.md
