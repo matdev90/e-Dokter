@@ -3,7 +3,10 @@ import jwt from "jsonwebtoken";
 import { pool } from "../db";
 import { authenticate, AuthRequest, generateTokens, logAudit } from "../middleware/auth";
 
-const JWT_SECRET = process.env.JWT_SECRET || "CHANGE-ME-DI-PRODUCTION";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET tidak diatur di environment");
+}
 const router = Router();
 
 router.get("/setting", async (_req, res) => {

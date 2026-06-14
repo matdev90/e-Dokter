@@ -88,9 +88,9 @@ Script akan:
 | `DB_HOST` | `localhost` | Host database |
 | `DB_PORT` | `3306` | Port database |
 | `DB_USER` | `root` | User database |
-| `DB_PASSWORD` | `09` | Password database |
+| `DB_PASSWORD` | - | Password database |
 | `DB_NAME` | `rsisa_lokal` | Nama database SIMRS |
-| `JWT_SECRET` | - | Secret key JWT |
+| `JWT_SECRET` | - | Secret key JWT (wajib, acak 64 karakter) |
 | `PORT` | `4000` | Port API |
 | `FRONTEND_URL` | `http://localhost:5173` | URL frontend untuk CORS |
 
@@ -102,12 +102,22 @@ Script akan:
 
 ## Login
 
+### Untuk Dokter
 Aplikasi menggunakan kredensial SIMRS yang sudah ada:
-
 - **Username**: Kode dokter SIMRS (contoh: `D00000034`)
 - **Password**: Password SIMRS dokter
 
-Untuk admin/assistant, gunakan akun yang dibuat melalui menu **Pengguna** (admin only).
+### Untuk Admin / Asisten
+Gunakan akun yang dibuat melalui menu **Pengguna** atau seed default:
+- **Email**: `admin@specialistcare.id`
+- **Password**: `admin123`
+
+⚠️ **Production**: Segera ganti password default setelah login pertama!
+
+### Keamanan
+- `JWT_SECRET` **wajib** diatur di `.env` — tidak ada fallback hardcoded
+- Generate secret: `openssl rand -hex 32`
+- Gunakan password database yang kuat (min 16 karakter)
 
 ## Struktur Proyek
 

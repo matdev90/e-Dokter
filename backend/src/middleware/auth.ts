@@ -2,7 +2,10 @@ import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { pool } from "../db";
 
-const JWT_SECRET = process.env.JWT_SECRET || "CHANGE-ME-DI-PRODUCTION";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET tidak diatur di environment");
+}
 
 export interface AuthRequest extends Request {
   user?: {
