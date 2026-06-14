@@ -99,7 +99,12 @@ fi
 # --------------------------------------------------
 log "[2/9] Membuat konfigurasi environment..."
 
-cat > "$APP_DIR/backend/.env" <<EOF
+ENV_FILE="$APP_DIR/backend/.env"
+if [ -f "$ENV_FILE" ] && [ "${FORCE_ENV:-false}" != "true" ]; then
+  warn "$ENV_FILE sudah ada. Gunakan FORCE_ENV=true untuk menimpa."
+  warn "Variabel yang sudah terlanjur ditimpa akan menggunakan nilai default."
+else
+  cat > "$ENV_FILE" <<EOF
 DB_HOST=$DB_HOST
 DB_PORT=$DB_PORT
 DB_USER=$DB_USER
@@ -109,7 +114,8 @@ JWT_SECRET=$JWT_SECRET
 PORT=$API_PORT
 FRONTEND_URL=http://$E_DOKTER_DOMAIN
 EOF
-ok "backend/.env berhasil dibuat"
+  ok "backend/.env berhasil dibuat"
+fi
 
 # --------------------------------------------------
 # 3. Test database connection
