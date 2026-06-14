@@ -1,8 +1,12 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import { pool } from "../db";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const JWT_SECRET: string = process.env.JWT_SECRET || "";
 if (!JWT_SECRET) {
   throw new Error("JWT_SECRET tidak diatur di environment");
 }
@@ -13,12 +17,13 @@ export interface AuthRequest extends Request {
     email: string;
     role: "doctor" | "assistant" | "admin";
     name: string;
+    doctor_code?: string;
   };
 }
 
-export function generateTokens(user: { id: number; email: string; role: string; name: string }) {
+export function generateTokens(user: { id: number; email: string; role: string; name: string; doctor_code?: string }) {
   const accessToken = jwt.sign(
-    { id: user.id, email: user.email, role: user.role, name: user.name },
+    { id: user.id, email: user.email, role: user.role, name: user.name, doctor_code: user.doctor_code },
     JWT_SECRET,
     { expiresIn: "8h" }
   );
@@ -44,6 +49,7 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
       email: decoded.email,
       role: decoded.role,
       name: decoded.name,
+      doctor_code: decoded.doctor_code,
     };
     next();
   } catch {
@@ -69,10 +75,21 @@ export async function logAudit(params: {
   ipAddress?: string;
 }) {
   try {
-    await pool.execute(
-      `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details, ip_address) VALUES (?, ?, ?, ?, ?, ?)`,
-      [params.userId ?? null, params.action, params.entityType, params.entityId ?? null, params.details ?? null, params.ipAddress ?? null]
-    );
+    const logDir = path.join(__dirname, "../../logs");
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
+    const logFile = path.join(logDir, "audit.log");
+    const entry = JSON.stringify({
+      timestamp: new Date().toISOString(),
+      userId: params.userId ?? null,
+      action: params.action,
+      entityType: params.entityType,
+      entityId: params.entityId ?? null,
+      details: params.details ?? null,
+      ipAddress: params.ipAddress ?? null,
+    });
+    fs.appendFileSync(logFile, entry + "\n");
   } catch (error) {
     console.error("Audit log error:", error);
   }

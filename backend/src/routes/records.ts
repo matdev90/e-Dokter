@@ -133,12 +133,7 @@ router.post("/", authenticate, authorize("doctor"), async (req: AuthRequest, res
     const seq = ((seqRows as any[])[0].cnt || 0) + 1;
     const noRawat = `${dateStr}/${String(seq).padStart(6, "0")}`;
 
-    const [drRows] = await pool.execute(
-      "SELECT doctor_code FROM app_users WHERE id = ?",
-      [req.user!.id]
-    );
-    const dr = (drRows as any[])[0];
-    const kdDokter = dr?.doctor_code || "D0000028";
+    const kdDokter = req.user!.doctor_code || "D0000028";
 
     await pool.execute(
       `INSERT INTO reg_periksa (no_rawat, tgl_registrasi, jam_reg, kd_dokter, no_rkm_medis, kd_poli, stts_daftar, status_lanjut, kd_pj, status_bayar, status_poli)

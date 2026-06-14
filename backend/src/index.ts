@@ -3,7 +3,7 @@ import cors from "cors";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import { pool, initAppTables } from "./db";
+import { pool } from "./db";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import authRoutes from "./routes/auth";
 import patientRoutes from "./routes/patients";
@@ -92,14 +92,6 @@ if (fs.existsSync(indexPath)) {
   app.get("*", (_req, res) => res.sendFile(indexPath));
 }
 
-initAppTables()
-  .then(() => {
-    console.log("App tables initialized");
-    app.listen(PORT, () => {
-      console.log(`e-Dokter API running on http://localhost:${PORT}`);
-    });
-  })
-  .catch((err) => {
-    console.error("App tables initialization failed:", err);
-    process.exit(1);
-  });
+app.listen(PORT, () => {
+  console.log(`e-Dokter API running on http://localhost:${PORT}`);
+});

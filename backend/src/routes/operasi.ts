@@ -309,12 +309,7 @@ router.get("/", authenticate, async (req: AuthRequest, res) => {
     const tgl_from = req.query.tgl_from as string || today;
     const tgl_to = req.query.tgl_to as string || today;
 
-    const [drRows] = await pool.execute(
-      "SELECT doctor_code FROM app_users WHERE id = ?",
-      [req.user!.id]
-    );
-    const dr = (drRows as any[])[0];
-    const dc = dr?.doctor_code || "";
+    const dc = req.user!.doctor_code || "";
 
     const dpjpFilter = dc ? `AND EXISTS (SELECT 1 FROM dpjp_ranap dp WHERE dp.no_rawat = l.no_rawat AND dp.kd_dokter = ?)` : "";
     const dpjpParams = dc ? [dc] : [];
@@ -447,9 +442,7 @@ router.get("/penjab", authenticate, async (_req: AuthRequest, res) => {
 
 router.get("/stats", authenticate, async (req: AuthRequest, res) => {
   try {
-    const [drRows] = await pool.execute("SELECT doctor_code FROM app_users WHERE id = ?", [req.user!.id]);
-    const dr = (drRows as any[])[0];
-    const dc = dr?.doctor_code || null;
+    const dc = req.user!.doctor_code || null;
 
     const today = new Date().toISOString().slice(0, 10);
     const tgl_from = req.query.tgl_from as string || today;
@@ -560,12 +553,7 @@ router.post("/", authenticate, authorize("doctor"), async (req: AuthRequest, res
       return res.status(403).json({ error: "Pasien sudah bayar, tidak dapat membuat laporan operasi karena dapat menambah tagihan pasien" });
     }
 
-    const [drRows] = await pool.execute(
-      "SELECT doctor_code FROM app_users WHERE id = ?",
-      [req.user!.id]
-    );
-    const dr = (drRows as any[])[0];
-    const kdDokter = dr?.doctor_code || null;
+    const kdDokter = req.user!.doctor_code || null;
 
     const conn = await pool.getConnection();
     try {

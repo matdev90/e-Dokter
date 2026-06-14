@@ -29,9 +29,7 @@ function getDoctorClauseRanap(dc: string | null): { sql: string; params: any[] }
 }
 
 async function getDoctorCode(req: AuthRequest): Promise<string | null> {
-  const [rows] = await pool.execute("SELECT doctor_code FROM app_users WHERE id = ?", [req.user!.id]);
-  const dr = (rows as any[])[0];
-  return dr?.doctor_code || null;
+  return req.user!.doctor_code || null;
 }
 
 router.get("/doctor-stats", authenticate, async (req: AuthRequest, res) => {

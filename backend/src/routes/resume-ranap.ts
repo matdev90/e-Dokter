@@ -6,11 +6,7 @@ const router = Router();
 
 router.get("/stats", authenticate, async (req: AuthRequest, res) => {
   try {
-    const [drRows] = await pool.execute(
-      "SELECT doctor_code FROM app_users WHERE id = ?",
-      [req.user!.id]
-    );
-    const dr = (drRows as any[])[0];
+    const dr = { doctor_code: req.user!.doctor_code };
 
     let whereClause = "WHERE rp.status_lanjut = 'Ranap' AND DATE_FORMAT(rp.tgl_registrasi, '%Y-%m') = DATE_FORMAT(CURDATE(), '%Y-%m')";
     const params: any[] = [];
@@ -72,11 +68,7 @@ router.get("/search-visit", authenticate, async (req: AuthRequest, res) => {
       whereClause += " AND DATE_FORMAT(rp.tgl_registrasi, '%Y-%m') = DATE_FORMAT(CURDATE(), '%Y-%m')";
     }
 
-    const [drRows] = await pool.execute(
-      "SELECT doctor_code FROM app_users WHERE id = ?",
-      [req.user!.id]
-    );
-    const dr = (drRows as any[])[0];
+    const dr = { doctor_code: req.user!.doctor_code };
     if (dr?.doctor_code) {
       whereClause += " AND EXISTS (SELECT 1 FROM dpjp_ranap dp WHERE dp.no_rawat = rp.no_rawat AND dp.kd_dokter = ?)";
       params.push(dr.doctor_code);
@@ -220,12 +212,7 @@ router.post("/", authenticate, async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "Visit not found" });
     }
 
-    const [drRows] = await pool.execute(
-      "SELECT doctor_code FROM app_users WHERE id = ?",
-      [req.user!.id]
-    );
-    const dr = (drRows as any[])[0];
-    const kd_dokter = dr?.doctor_code || null;
+    const kd_dokter = req.user!.doctor_code || null;
 
     const nullableFields = new Set(["ket_keluar", "ket_keadaan", "ket_dilanjutkan", "kontrol"]);
     const toValue = (key: string, val: any) =>

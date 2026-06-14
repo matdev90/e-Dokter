@@ -1,16 +1,15 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { pool } from "../db";
 import { authenticate, authorize, AuthRequest, logAudit } from "../middleware/auth";
+import { getUsers, saveUsers } from "../db/store";
 
 const router = Router();
 
+let nextUserId = Date.now();
+
 router.get("/", authenticate, authorize("admin"), async (_req: AuthRequest, res) => {
   try {
-    const [rows] = await pool.execute(
-      `SELECT id, email, name, role, is_active, created_at FROM app_users ORDER BY created_at DESC`
-    );
-    const users = (rows as any[]).map((u: any) => ({
+    const users = getUsers().map((u: any) => ({
       id: u.id,
       email: u.email,
       name: u.name,
@@ -35,33 +34,35 @@ router.post("/", authenticate, authorize("admin"), async (req: AuthRequest, res)
       return res.status(400).json({ error: "Invalid role" });
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
-    const [result] = await pool.execute(
-      "INSERT INTO app_users (email, password_hash, name, role) VALUES (?, ?, ?, ?)",
-      [email, passwordHash, name, role]
-    );
+    const users = getUsers();
+    if (users.find((u: any) => u.email === email)) {
+      return res.status(400).json({ error: "Email already exists" });
+    }
 
-    const insertId = (result as any).insertId;
-    const [rows] = await pool.execute(
-      "SELECT id, email, name, role FROM app_users WHERE id = ?",
-      [insertId]
-    );
-    const user = (rows as any[])[0];
+    const passwordHash = await bcrypt.hash(password, 10);
+    const newUser = {
+      id: nextUserId++,
+      email,
+      name,
+      role,
+      password_hash: passwordHash,
+      is_active: true,
+      created_at: new Date().toISOString(),
+    };
+    users.push(newUser);
+    saveUsers(users);
 
     await logAudit({
       userId: req.user!.id,
       action: "create_user",
       entityType: "user",
-      entityId: String(user.id),
+      entityId: String(newUser.id),
       details: `Created user: ${email} (${role})`,
       ipAddress: req.ip,
     });
 
-    return res.status(201).json(user);
+    return res.status(201).json({ id: newUser.id, email: newUser.email, name: newUser.name, role: newUser.role });
   } catch (error: any) {
-    if (error?.code === "ER_DUP_ENTRY") {
-      return res.status(400).json({ error: "Email already exists" });
-    }
     console.error("Create user error:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
@@ -69,53 +70,40 @@ router.post("/", authenticate, authorize("admin"), async (req: AuthRequest, res)
 
 router.put("/:id", authenticate, authorize("admin"), async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     const { email, name, role, isActive, password } = req.body;
 
-    const updates: string[] = [];
-    const params: any[] = [];
+    const users = getUsers();
+    const idx = users.findIndex((u: any) => u.id === id);
+    if (idx === -1) {
+      return res.status(404).json({ error: "User not found" });
+    }
 
-    if (email) { updates.push("email = ?"); params.push(email); }
-    if (name) { updates.push("name = ?"); params.push(name); }
-    if (role) { updates.push("role = ?"); params.push(role); }
-    if (isActive !== undefined) { updates.push("is_active = ?"); params.push(isActive ? 1 : 0); }
+    if (email) users[idx].email = email;
+    if (name) users[idx].name = name;
+    if (role) users[idx].role = role;
+    if (isActive !== undefined) users[idx].is_active = isActive;
     if (password) {
-      const hash = await bcrypt.hash(password, 10);
-      updates.push("password_hash = ?");
-      params.push(hash);
+      users[idx].password_hash = await bcrypt.hash(password, 10);
     }
 
-    if (updates.length === 0) {
-      return res.status(400).json({ error: "No fields to update" });
-    }
-
-    params.push(id);
-    await pool.execute(
-      `UPDATE app_users SET ${updates.join(", ")} WHERE id = ?`,
-      params
-    );
-
-    const [rows] = await pool.execute(
-      "SELECT id, email, name, role, is_active FROM app_users WHERE id = ?",
-      [id]
-    );
-    const updated = (rows as any[])[0];
+    saveUsers(users);
 
     await logAudit({
       userId: req.user!.id,
       action: "update_user",
       entityType: "user",
       entityId: String(id),
-      details: `Updated user: ${updated.email}`,
+      details: `Updated user: ${users[idx].email}`,
       ipAddress: req.ip,
     });
 
     return res.json({
-      id: updated.id,
-      email: updated.email,
-      name: updated.name,
-      role: updated.role,
-      isActive: !!updated.is_active,
+      id: users[idx].id,
+      email: users[idx].email,
+      name: users[idx].name,
+      role: users[idx].role,
+      isActive: !!users[idx].is_active,
     });
   } catch (error) {
     console.error("Update user error:", error);

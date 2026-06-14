@@ -28,11 +28,7 @@ router.get("/", authenticate, async (req: AuthRequest, res) => {
     const tgl_to = req.query.tgl_to as string || today;
     const pj = req.query.pj as string || "";
 
-    const dc = await (async () => {
-      const [rows] = await pool.execute("SELECT doctor_code FROM app_users WHERE id = ?", [req.user!.id]);
-      const dr = (rows as any[])[0];
-      return dr?.doctor_code || null;
-    })();
+    const dc = req.user!.doctor_code || null;
 
     const queries: string[] = [];
     const countQueries: string[] = [];
@@ -134,9 +130,7 @@ router.get("/", authenticate, async (req: AuthRequest, res) => {
 
 router.get("/stats", authenticate, async (req: AuthRequest, res) => {
   try {
-    const [drRows] = await pool.execute("SELECT doctor_code FROM app_users WHERE id = ?", [req.user!.id]);
-    const dr = (drRows as any[])[0];
-    const dc = dr?.doctor_code || null;
+    const dc = req.user!.doctor_code || null;
 
     const today = new Date().toISOString().slice(0, 10);
     const tgl_from = req.query.tgl_from as string || today;

@@ -1,29 +1,32 @@
-import { pool, initAppTables } from "./index";
 import bcrypt from "bcryptjs";
+import { getUsers, saveUsers } from "./store";
+import { pool } from "./index";
 
 async function seed() {
-  await initAppTables();
-
-  const [rows] = await pool.execute("SELECT id FROM app_users WHERE email = ?", ["admin@specialistcare.id"]);
-  if ((rows as any[]).length > 0) {
-    console.log("Seed data already exists");
+  const users = getUsers();
+  if (users.length > 0) {
+    console.log("Seed data already exists (users.json has data)");
     process.exit(0);
   }
 
   const hash = await bcrypt.hash("admin123", 10);
 
-  await pool.execute(
-    `INSERT INTO app_users (email, password_hash, name, role, doctor_code) VALUES (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?)`,
-    [
-      "admin@specialistcare.id", hash, "Admin Utama", "admin", null,
-      "dr.reza@specialistcare.id", hash, "Dr. Reza", "doctor", "D00000034",
-      "dr.ayu@specialistcare.id", hash, "Dr. Ayu", "doctor", "D0000018",
-      "staff@specialistcare.id", hash, "Staf Admin", "assistant", null,
-    ]
-  );
+  let nextId = Date.now();
+  const seedUsers = [
+    { email: "admin@specialistcare.id", username: "admin", name: "Admin Utama", role: "admin", doctor_code: null, password_hash: hash },
+    { email: "staff@specialistcare.id", username: "staff", name: "Staf Admin", role: "assistant", doctor_code: null, password_hash: hash },
+  ];
+
+  seedUsers.forEach((u: any) => {
+    u.id = nextId++;
+    u.is_active = true;
+    u.created_at = new Date().toISOString();
+    users.push(u);
+  });
+  saveUsers(users);
 
   console.log("Seed data created!");
-  console.log("Default password for all users: admin123");
+  console.log("Default login — email: admin@specialistcare.id, password: admin123");
   process.exit(0);
 }
 

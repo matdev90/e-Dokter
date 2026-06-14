@@ -1,13 +1,61 @@
 import { Router } from "express";
 import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
 import { pool } from "../db";
 import { authenticate, AuthRequest, generateTokens, logAudit } from "../middleware/auth";
+import { getUsers, saveUsers, getRefreshTokens, saveRefreshTokens } from "../db/store";
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET: string = process.env.JWT_SECRET || "";
 if (!JWT_SECRET) {
   throw new Error("JWT_SECRET tidak diatur di environment");
 }
 const router = Router();
+
+let nextUserId = Date.now();
+
+function findOrCreateDoctor(kdDokter: string, nmDokter: string) {
+  const users = getUsers();
+  let user = users.find((u: any) => u.doctor_code === kdDokter);
+  if (!user) {
+    user = {
+      id: nextUserId++,
+      email: kdDokter.toLowerCase() + "@rsisa.local",
+      name: nmDokter,
+      role: "doctor",
+      doctor_code: kdDokter,
+      is_active: true,
+      created_at: new Date().toISOString(),
+    };
+    users.push(user);
+    saveUsers(users);
+  }
+  return user;
+}
+
+function storeRefreshToken(userId: number, token: string) {
+  const tokens = getRefreshTokens();
+  tokens.push({
+    user_id: userId,
+    token,
+    expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    created_at: new Date().toISOString(),
+  });
+  saveRefreshTokens(tokens);
+}
+
+function findRefreshToken(token: string) {
+  return getRefreshTokens().find((t: any) => t.token === token);
+}
+
+function deleteRefreshToken(token: string) {
+  const tokens = getRefreshTokens().filter((t: any) => t.token !== token);
+  saveRefreshTokens(tokens);
+}
+
+function deleteUserRefreshTokens(userId: number) {
+  const tokens = getRefreshTokens().filter((t: any) => t.user_id !== userId);
+  saveRefreshTokens(tokens);
+}
 
 router.get("/setting", async (_req, res) => {
   try {
@@ -44,79 +92,81 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ error: "Username dan password harus diisi" });
     }
 
+    // Try SIMRS login first (for doctors)
     const [userRows] = await pool.execute(
       "SELECT id_user, AES_DECRYPT(id_user, 'nur') AS username FROM user WHERE id_user = AES_ENCRYPT(?, 'nur') AND password = AES_ENCRYPT(?, 'windi')",
       [username, password]
     );
     const userRecord = (userRows as any[])[0];
 
-    if (!userRecord) {
-      return res.status(401).json({ error: "Username/password salah" });
-    }
+    if (userRecord) {
+      const rawUsername = userRecord.username;
+      const kdDokter = typeof rawUsername === "string" ? rawUsername : (rawUsername as Buffer).toString();
 
-    const rawUsername = userRecord.username;
-    const kdDokter = typeof rawUsername === "string" ? rawUsername : (rawUsername as Buffer).toString();
-
-    const [dokterRows] = await pool.execute(
-      "SELECT kd_dokter, nm_dokter FROM dokter WHERE kd_dokter = ?",
-      [kdDokter]
-    );
-    const dokter = (dokterRows as any[])[0];
-
-    if (!dokter) {
-      return res.status(403).json({ error: "Akun ini bukan dokter" });
-    }
-
-    let [existing] = await pool.execute(
-      "SELECT id, email, name, role, spesialisasi FROM app_users WHERE doctor_code = ?",
-      [kdDokter]
-    );
-    let appUser = (existing as any[])[0];
-
-    if (!appUser) {
-      const email = kdDokter.toLowerCase() + "@rsisa.local";
-      const [result] = await pool.execute(
-        "INSERT INTO app_users (email, username, name, role, doctor_code, is_active, password_hash) VALUES (?, ?, ?, 'doctor', ?, 1, ?)",
-        [email, kdDokter, dokter.nm_dokter, kdDokter, ""]
+      const [dokterRows] = await pool.execute(
+        "SELECT kd_dokter, nm_dokter FROM dokter WHERE kd_dokter = ?",
+        [kdDokter]
       );
-      appUser = {
-        id: (result as any).insertId,
-        email,
-        name: dokter.nm_dokter,
-        role: "doctor",
-        spesialisasi: null,
-      };
+      const dokter = (dokterRows as any[])[0];
+
+      if (!dokter) {
+        return res.status(403).json({ error: "Akun ini bukan dokter" });
+      }
+
+      const appUser = findOrCreateDoctor(kdDokter, dokter.nm_dokter);
+
+      const tokens = generateTokens({ ...appUser, doctor_code: kdDokter });
+      storeRefreshToken(appUser.id, tokens.refreshToken);
+
+      await logAudit({
+        userId: appUser.id, action: "login", entityType: "user",
+        entityId: String(appUser.id), ipAddress: req.ip,
+      });
+
+      return res.json({
+        user: {
+          id: appUser.id,
+          email: appUser.email,
+          name: dokter.nm_dokter,
+          role: "doctor",
+          doctor_code: kdDokter,
+        },
+        ...tokens,
+      });
     }
 
-    await pool.execute(
-      "UPDATE app_users SET last_login = NOW() WHERE id = ?",
-      [appUser.id]
+    // Try app user login (for admin/assistant)
+    const users = getUsers();
+    const appUser = users.find((u: any) =>
+      (u.email === username || u.username === username) && u.is_active !== false
     );
 
-    const tokens = generateTokens(appUser);
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().replace("T", " ").replace("Z", "");
+    if (appUser) {
+      const valid = await bcrypt.compare(password, appUser.password_hash || "");
+      if (!valid) {
+        return res.status(401).json({ error: "Username/password salah" });
+      }
 
-    await pool.execute(
-      "INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES (?, ?, ?)",
-      [appUser.id, tokens.refreshToken, expiresAt]
-    );
+      const tokens = generateTokens(appUser);
+      storeRefreshToken(appUser.id, tokens.refreshToken);
 
-    await logAudit({
-      userId: appUser.id, action: "login", entityType: "user",
-      entityId: String(appUser.id), ipAddress: req.ip,
-    });
+      await logAudit({
+        userId: appUser.id, action: "login", entityType: "user",
+        entityId: String(appUser.id), ipAddress: req.ip,
+      });
 
-    return res.json({
-      user: {
-        id: appUser.id,
-        email: appUser.email,
-        name: appUser.name,
-        role: "doctor",
-        spesialisasi: appUser.spesialisasi,
-        doctor_code: kdDokter,
-      },
-      ...tokens,
-    });
+      return res.json({
+        user: {
+          id: appUser.id,
+          email: appUser.email,
+          name: appUser.name,
+          role: appUser.role,
+        },
+        ...tokens,
+      });
+    }
+
+    return res.status(401).json({ error: "Username/password salah" });
   } catch (error) {
     console.error("Login error:", error);
     return res.status(500).json({ error: "Internal server error" });
@@ -130,34 +180,23 @@ router.post("/refresh", async (req, res) => {
       return res.status(400).json({ error: "Refresh token required" });
     }
 
-    const [rows] = await pool.execute(
-      "SELECT * FROM refresh_tokens WHERE token = ?",
-      [refreshToken]
-    );
-    const stored = (rows as any[])[0];
+    const stored = findRefreshToken(refreshToken);
     if (!stored || new Date(stored.expires_at) < new Date()) {
       return res.status(401).json({ error: "Invalid or expired refresh token" });
     }
 
     try {
       const decoded = jwt.verify(refreshToken, JWT_SECRET) as any;
-      const [userRows] = await pool.execute(
-        "SELECT id, email, name, role FROM app_users WHERE id = ?",
-        [decoded.id]
-      );
-      const user = (userRows as any[])[0];
+      const users = getUsers();
+      const user = users.find((u: any) => u.id === decoded.id);
+
       if (!user) {
         return res.status(401).json({ error: "User not found" });
       }
 
       const tokens = generateTokens(user);
-      await pool.execute("DELETE FROM refresh_tokens WHERE token = ?", [refreshToken]);
-
-      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().replace("T", " ").replace("Z", "");
-      await pool.execute(
-        "INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES (?, ?, ?)",
-        [user.id, tokens.refreshToken, expiresAt]
-      );
+      deleteRefreshToken(refreshToken);
+      storeRefreshToken(user.id, tokens.refreshToken);
 
       return res.json(tokens);
     } catch {
@@ -173,7 +212,7 @@ router.post("/logout", authenticate, async (req: AuthRequest, res) => {
   try {
     const { refreshToken } = req.body;
     if (refreshToken) {
-      await pool.execute("DELETE FROM refresh_tokens WHERE token = ?", [refreshToken]);
+      deleteRefreshToken(refreshToken);
     }
     await logAudit({
       userId: req.user!.id, action: "logout", entityType: "user",
@@ -188,11 +227,7 @@ router.post("/logout", authenticate, async (req: AuthRequest, res) => {
 
 router.get("/me", authenticate, async (req: AuthRequest, res) => {
   try {
-    const [rows] = await pool.execute(
-      "SELECT id, email, name, role, spesialisasi, doctor_code FROM app_users WHERE id = ?",
-      [req.user!.id]
-    );
-    const user = (rows as any[])[0];
+    const user = req.user;
     if (!user) return res.status(404).json({ error: "User not found" });
 
     if (user.doctor_code) {
@@ -203,7 +238,6 @@ router.get("/me", authenticate, async (req: AuthRequest, res) => {
       const dokter = (dokterRows as any[])[0];
       if (dokter) {
         user.name = dokter.nm_dokter;
-        user.spesialisasi = dokter.spesialisasi;
       }
     }
 
@@ -233,37 +267,52 @@ router.put("/change-password", authenticate, async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "Password harus mengandung minimal 1 karakter khusus" });
     }
 
-    const [userRows] = await pool.execute(
-      "SELECT id, doctor_code FROM app_users WHERE id = ?",
-      [req.user!.id]
-    );
-    const appUser = (userRows as any[])[0];
-    if (!appUser || !appUser.doctor_code) {
-      return res.status(400).json({ error: "Akun ini tidak dapat mengganti password" });
+    const user = req.user!;
+
+    if (user.doctor_code) {
+      // Change SIMRS password
+      const [checkRows] = await pool.execute(
+        "SELECT id_user FROM user WHERE id_user = AES_ENCRYPT(?, 'nur') AND password = AES_ENCRYPT(?, 'windi')",
+        [user.doctor_code, old_password]
+      );
+      if ((checkRows as any[]).length === 0) {
+        return res.status(400).json({ error: "Password lama tidak sesuai" });
+      }
+
+      if (old_password === new_password) {
+        return res.status(400).json({ error: "Password baru tidak boleh sama dengan password saat ini" });
+      }
+
+      await pool.execute(
+        "UPDATE user SET password = AES_ENCRYPT(?, 'windi') WHERE id_user = AES_ENCRYPT(?, 'nur')",
+        [new_password, user.doctor_code]
+      );
+    } else {
+      // Change app user password
+      const users = getUsers();
+      const appUser = users.find((u: any) => u.id === user.id);
+      if (!appUser) {
+        return res.status(400).json({ error: "Akun tidak ditemukan" });
+      }
+
+      const valid = await bcrypt.compare(old_password, appUser.password_hash || "");
+      if (!valid) {
+        return res.status(400).json({ error: "Password lama tidak sesuai" });
+      }
+
+      if (old_password === new_password) {
+        return res.status(400).json({ error: "Password baru tidak boleh sama dengan password saat ini" });
+      }
+
+      appUser.password_hash = await bcrypt.hash(new_password, 10);
+      saveUsers(users);
     }
 
-    const [checkRows] = await pool.execute(
-      "SELECT id_user FROM user WHERE id_user = AES_ENCRYPT(?, 'nur') AND password = AES_ENCRYPT(?, 'windi')",
-      [appUser.doctor_code, old_password]
-    );
-    if ((checkRows as any[]).length === 0) {
-      return res.status(400).json({ error: "Password lama tidak sesuai" });
-    }
-
-    if (old_password === new_password) {
-      return res.status(400).json({ error: "Password baru tidak boleh sama dengan password saat ini" });
-    }
-
-    await pool.execute(
-      "UPDATE user SET password = AES_ENCRYPT(?, 'windi') WHERE id_user = AES_ENCRYPT(?, 'nur')",
-      [new_password, appUser.doctor_code]
-    );
-
-    await pool.execute("DELETE FROM refresh_tokens WHERE user_id = ?", [req.user!.id]);
+    deleteUserRefreshTokens(user.id!);
 
     await logAudit({
-      userId: req.user!.id, action: "change_password", entityType: "user",
-      entityId: String(req.user!.id), details: "Password changed",
+      userId: user.id, action: "change_password", entityType: "user",
+      entityId: String(user.id), details: "Password changed",
       ipAddress: req.ip,
     });
 
@@ -276,21 +325,26 @@ router.put("/change-password", authenticate, async (req: AuthRequest, res) => {
 
 router.post("/seed", async (_req, res) => {
   try {
-    const [rows] = await pool.execute("SELECT id FROM app_users WHERE email = ?", ["admin@specialistcare.id"]);
-    if ((rows as any[]).length > 0) {
+    const users = getUsers();
+    if (users.find((u: any) => u.email === "admin@specialistcare.id")) {
       return res.json({ message: "Seed data already exists" });
     }
 
-    await pool.execute(
-      `INSERT INTO app_users (email, username, name, role, doctor_code, is_active)
-       VALUES (?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?)`,
-      [
-        "admin@specialistcare.id", "admin", "Admin Utama", "admin", null, 1,
-        "dr.reza@specialistcare.id", "D00000034", "dr. Syahroni Sinaryadikara", "doctor", "D00000034", 1,
-        "dr.ayu@specialistcare.id", "D0000018", "dr. Laila Nurmala", "doctor", "D0000018", 1,
-        "staff@specialistcare.id", "staff", "Staf Admin", "assistant", null, 1,
-      ]
-    );
+    const hash = await bcrypt.hash("admin123", 10);
+    const seedUsers = [
+      { email: "admin@specialistcare.id", username: "admin", name: "Admin Utama", role: "admin", doctor_code: null, password_hash: hash },
+      { email: "dr.reza@specialistcare.id", username: "D00000034", name: "dr. Syahroni Sinaryadikara", role: "doctor", doctor_code: "D00000034", password_hash: "" },
+      { email: "dr.ayu@specialistcare.id", username: "D0000018", name: "dr. Laila Nurmala", role: "doctor", doctor_code: "D0000018", password_hash: "" },
+      { email: "staff@specialistcare.id", username: "staff", name: "Staf Admin", role: "assistant", doctor_code: null, password_hash: hash },
+    ];
+
+    seedUsers.forEach((u: any) => {
+      u.id = nextUserId++;
+      u.is_active = true;
+      u.created_at = new Date().toISOString();
+      users.push(u);
+    });
+    saveUsers(users);
 
     return res.json({ message: "Seed data created." });
   } catch (error) {
@@ -299,7 +353,6 @@ router.post("/seed", async (_req, res) => {
   }
 });
 
-// Search dokter by name or code
 router.get("/dokter/search", authenticate, async (req: AuthRequest, res) => {
   try {
     const q = (req.query.q as string || "").trim();
@@ -317,7 +370,6 @@ router.get("/dokter/search", authenticate, async (req: AuthRequest, res) => {
   }
 });
 
-// Search pegawai/karyawan by name (active only)
 router.get("/pegawai/search", authenticate, async (req: AuthRequest, res) => {
   try {
     const q = (req.query.q as string || "").trim();

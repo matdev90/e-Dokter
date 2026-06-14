@@ -18,11 +18,7 @@ router.get("/search-visit", authenticate, async (req: AuthRequest, res) => {
     let whereClause = "WHERE rp.status_lanjut = 'Ralan'";
     const params: any[] = [];
 
-    const [drRows] = await pool.execute(
-      "SELECT doctor_code FROM app_users WHERE id = ?",
-      [req.user!.id]
-    );
-    const dr = (drRows as any[])[0];
+    const dr = { doctor_code: req.user!.doctor_code };
     if (dr?.doctor_code) {
       whereClause += " AND rp.kd_dokter = ?";
       params.push(dr.doctor_code);
@@ -157,12 +153,7 @@ router.post("/", authenticate, async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "Visit not found" });
     }
 
-    const [drRows] = await pool.execute(
-      "SELECT doctor_code FROM app_users WHERE id = ?",
-      [req.user!.id]
-    );
-    const dr = (drRows as any[])[0];
-    const kd_dokter = dr?.doctor_code || null;
+    const kd_dokter = req.user!.doctor_code || null;
 
     await pool.execute(
       `INSERT INTO resume_pasien (
@@ -412,12 +403,7 @@ router.get("/auto-fill/:no_rawat", authenticate, async (req: AuthRequest, res) =
 
 router.get("/stats", authenticate, async (req: AuthRequest, res) => {
   try {
-    const [drRows] = await pool.execute(
-      "SELECT doctor_code FROM app_users WHERE id = ?",
-      [req.user!.id]
-    );
-    const dr = (drRows as any[])[0];
-    const doctorCode = dr?.doctor_code;
+    const doctorCode = req.user!.doctor_code;
 
     let whereClause = "WHERE rp.status_lanjut = 'Ralan' AND rp.tgl_registrasi = CURDATE()";
     const params: any[] = [];
@@ -472,12 +458,7 @@ router.get("/stats", authenticate, async (req: AuthRequest, res) => {
 
 router.get("/poliklinik", authenticate, async (req: AuthRequest, res) => {
   try {
-    const [drRows] = await pool.execute(
-      "SELECT doctor_code FROM app_users WHERE id = ?",
-      [req.user!.id]
-    );
-    const dr = (drRows as any[])[0];
-    const doctorCode = dr?.doctor_code;
+    const doctorCode = req.user!.doctor_code;
 
     if (doctorCode) {
       const [jadwalRows] = await pool.execute(
@@ -504,12 +485,8 @@ router.get("/poliklinik", authenticate, async (req: AuthRequest, res) => {
 
 router.get("/current-jadwal", authenticate, async (req: AuthRequest, res) => {
   try {
-    const [drRows] = await pool.execute(
-      "SELECT doctor_code FROM app_users WHERE id = ?",
-      [req.user!.id]
-    );
-    const dr = (drRows as any[])[0];
-    if (!dr?.doctor_code) return res.json(null);
+    const doctorCode = req.user!.doctor_code;
+    if (!doctorCode) return res.json(null);
 
     const [todayRows] = await pool.execute(
       `SELECT j.kd_poli, p.nm_poli, j.hari_kerja, j.jam_mulai, j.jam_selesai
@@ -519,7 +496,7 @@ router.get("/current-jadwal", authenticate, async (req: AuthRequest, res) => {
          AND j.hari_kerja = ELT(DAYOFWEEK(CURDATE()), 'AKHAD','SENIN','SELASA','RABU','KAMIS','JUMAT','SABTU')
        ORDER BY j.jam_mulai
        LIMIT 1`,
-      [dr.doctor_code]
+      [doctorCode]
     );
     const today = (todayRows as any[])[0];
     if (!today) return res.json(null);
@@ -534,7 +511,7 @@ router.get("/current-jadwal", authenticate, async (req: AuthRequest, res) => {
          AND CURTIME() <= j.jam_selesai
        ORDER BY j.jam_mulai
        LIMIT 1`,
-      [dr.doctor_code]
+      [doctorCode]
     );
     const active = (activeRows as any[])[0] || null;
 

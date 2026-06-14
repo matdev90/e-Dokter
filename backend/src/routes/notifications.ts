@@ -6,12 +6,7 @@ const router = Router();
 
 router.get("/", authenticate, async (req: AuthRequest, res) => {
   try {
-    const [drRows] = await pool.execute(
-      "SELECT doctor_code FROM app_users WHERE id = ?",
-      [req.user!.id]
-    );
-    const dr = (drRows as any[])[0];
-    const dc = dr?.doctor_code || "";
+    const dc = req.user!.doctor_code || "";
 
     // 1. Belum Resume Ralan (hari ini)
     const [[ralanRes]] = await pool.execute(
