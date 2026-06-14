@@ -2,7 +2,9 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 import fs from "fs";
-import { initAppTables } from "./db";
+import { fileURLToPath } from "url";
+import { pool, initAppTables } from "./db";
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import authRoutes from "./routes/auth";
 import patientRoutes from "./routes/patients";
 import recordRoutes from "./routes/records";
@@ -23,14 +25,12 @@ const isProd = !FRONTEND_URL || FRONTEND_URL === `http://localhost:${PORT}`;
 
 app.use(cors({ origin: FRONTEND_URL || `http://localhost:${PORT}`, credentials: true }));
 app.use(express.json({ limit: "50mb" }));
-app.use("/uploads", express.static(path.join(import.meta.dir, "../uploads")));
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
-// In production, serve the built frontend
-if (isProd) {
-  const distPath = path.join(import.meta.dir, "../../frontend/dist");
-  if (fs.existsSync(distPath)) {
-    app.use(express.static(distPath));
-  }
+// Serve the built frontend
+const distPath = path.join(__dirname, "../../frontend/dist");
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
 }
 
 app.get("/ping", (_req, res) => res.json({ status: "ok", timestamp: new Date().toISOString() }));
@@ -86,13 +86,10 @@ app.get("/api/icd9/search", async (req, res) => {
   }
 });
 
-// SPA fallback — serve index.html for any non-API route (production only)
-if (isProd) {
-  const distPath = path.join(import.meta.dir, "../../frontend/dist");
-  const indexPath = path.join(distPath, "index.html");
-  if (fs.existsSync(indexPath)) {
-    app.get("*", (_req, res) => res.sendFile(indexPath));
-  }
+// SPA fallback — serve index.html for any non-API route
+const indexPath = path.join(distPath, "index.html");
+if (fs.existsSync(indexPath)) {
+  app.get("*", (_req, res) => res.sendFile(indexPath));
 }
 
 initAppTables()

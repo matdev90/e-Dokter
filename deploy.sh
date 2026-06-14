@@ -36,12 +36,10 @@ DOMAIN_MAIN="${DOMAIN_MAIN:-rsisanggoro.com}"
 SERVER_ADMIN="${SERVER_ADMIN:-admin@rsisanggoro.com}"
 SERVER_USER="${SUDO_USER:-$(whoami)}"
 
-# Auto-detect Bun path
-BUN_PATH=""
-if command -v bun &>/dev/null; then
-  BUN_PATH=$(command -v bun)
-elif [ -f "$HOME/.bun/bin/bun" ]; then
-  BUN_PATH="$HOME/.bun/bin/bun"
+# Auto-detect Node.js
+NODE_PATH=""
+if command -v node &>/dev/null; then
+  NODE_PATH=$(command -v node)
 fi
 
 FRONTEND_URL="${FRONTEND_URL:-http://$E_DOKTER_DOMAIN}"
@@ -72,26 +70,18 @@ if ! command -v mysql &>/dev/null; then
 fi
 ok "MySQL client tersedia"
 
-if command -v bun &>/dev/null; then
-  BUN=$(command -v bun)
-  ok "Bun ditemukan: $BUN ($(bun --version))"
-else
-  warn "Bun belum terinstall. Menginstall Bun..."
-  curl -fsSL https://bun.sh/install | bash
-  export PATH="$HOME/.bun/bin:$PATH"
-  if ! command -v bun &>/dev/null; then
-    fail "Gagal menginstall Bun. Install manual: curl -fsSL https://bun.sh/install | bash"
-  fi
-  BUN_PATH=$(command -v bun)
-  ok "Bun berhasil diinstall: $(bun --version)"
-fi
-
 if ! command -v node &>/dev/null; then
   warn "Node.js belum terinstall. Menginstall Node.js..."
   curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs
   ok "Node.js berhasil diinstall: $(node --version)"
+else
+  ok "Node.js tersedia: $(node --version)"
 fi
-ok "Node.js tersedia: $(node --version)"
+
+if ! command -v npm &>/dev/null; then
+  fail "npm tidak ditemukan."
+fi
+ok "npm tersedia: $(npm --version)"
 
 # --------------------------------------------------
 # 2. Setup environment variables
@@ -127,7 +117,7 @@ fi
 log "[4/9] Menginstall dependensi backend..."
 
 cd "$APP_DIR/backend"
-bun install --frozen-lockfile 2>/dev/null || bun install
+npm install
 ok "Dependensi backend selesai"
 
 # --------------------------------------------------
@@ -146,7 +136,7 @@ ok "Frontend berhasil di-build ke frontend/dist/"
 log "[6/9] Menyiapkan data aplikasi..."
 
 cd "$APP_DIR/backend"
-bun run src/db/seed.ts 2>&1 || warn "Seed mungkin sudah ada (abaikan jika sudah ada user)"
+npx tsx src/db/seed.ts 2>&1 || warn "Seed mungkin sudah ada (abaikan jika sudah ada user)"
 ok "Data aplikasi siap"
 
 # --------------------------------------------------
@@ -167,7 +157,7 @@ Wants=mysql.service
 Type=simple
 User=$SERVER_USER
 WorkingDirectory=$APP_DIR/backend
-ExecStart=$BUN_PATH run src/index.ts
+ExecStart=$NODE_PATH $(which npm) exec tsx src/index.ts
 Restart=always
 RestartSec=5
 Environment=NODE_ENV=production

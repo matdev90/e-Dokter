@@ -1,15 +1,19 @@
 {
   "name": "e-dokter",
   "version": "0.1.0",
-  "description": "Example project for Bun integration in e-dokter",
-  "main": "src/server.ts",
+  "private": true,
   "scripts": {
-    "start:bun": "bun src/server.ts",
-    "dev:bun": "bun src/server.ts",
-    "build:bun": "bun build src/server.ts --outdir=dist --minify",
-    "test:bun": "bun test"
+    "dev": "tsx src/server.ts",
+    "start": "tsx src/server.ts",
+    "build": "tsx src/server.ts"
   },
   "author": "",
   "license": "MIT",
-  "dependencies": {}
+  "dependencies": {
+    "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
 }

@@ -3,9 +3,11 @@ import { pool } from "../db";
 import { authenticate, authorize, AuthRequest, logAudit } from "../middleware/auth";
 import multer from "multer";
 import path from "path";
+import { fileURLToPath } from "url";
 import { v4 as uuidv4 } from "uuid";
 
-const UPLOAD_DIR = path.join(import.meta.dir, "../../uploads");
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const UPLOAD_DIR = path.join(__dirname, "../../uploads");
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),

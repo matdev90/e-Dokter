@@ -1,13 +1,12 @@
-import { serve } from "bun";
+import express from "express";
 
-// Simple health check endpoint
-serve({
-  port: 3000,
-  fetch(req) {
-    const url = new URL(req.url);
-    if (url.pathname === "/ping") {
-      return new Response("pong", { status: 200 });
-    }
-    return new Response("Not Found", { status: 404 });
-  },
+const app = express();
+const PORT = parseInt(process.env.PORT || "3000");
+
+app.get("/ping", (_req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+app.listen(PORT, () => {
+  console.log(`e-Dokter health server running on http://localhost:${PORT}`);
 });

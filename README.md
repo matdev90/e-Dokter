@@ -18,14 +18,13 @@ Aplikasi web untuk pembuatan resume medis dan laporan operasi, terintegrasi deng
 | Layer | Teknologi |
 |-------|-----------|
 | Frontend | React 19, TypeScript, Vite, React Router, Recharts |
-| Backend | Express.js, TypeScript, Bun |
+| Backend | Express.js, TypeScript |
 | Database | MySQL (database SIMRS existing) |
 | Auth | JWT + Refresh Token, AES Encrypt (SIMRS) |
 
 ## Persyaratan
 
 - Node.js 20+
-- Bun
 - MySQL (database SIMRS)
 - Apache (production, untuk reverse proxy)
 
@@ -43,8 +42,8 @@ cd e-Dokter
 ```bash
 cd backend
 cp .env.example .env   # sesuaikan konfigurasi database
-bun install
-bun run dev            # http://localhost:4000
+npm install
+npm run dev            # http://localhost:4000
 ```
 
 ### 3. Frontend
