@@ -22,34 +22,28 @@ import notificationRoutes from "./routes/notifications";
 const app = express();
 const PORT = parseInt(process.env.PORT || "4000");
 const FRONTEND_URL = process.env.FRONTEND_URL || "";
-const isProd = !FRONTEND_URL || FRONTEND_URL === `http://localhost:${PORT}`;
 
 app.use(cors({ origin: FRONTEND_URL || `http://localhost:${PORT}`, credentials: true }));
 app.use(express.json({ limit: "50mb" }));
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
-// Serve the built frontend
 const distPath = path.join(__dirname, "../../frontend/dist");
-if (fs.existsSync(distPath)) {
-  app.use(express.static(distPath));
-}
 
-app.get("/ping", (_req, res) => res.json({ status: "ok", timestamp: new Date().toISOString() }));
+const apiRouter = express.Router();
+apiRouter.use("/auth", authRoutes);
+apiRouter.use("/patients", patientRoutes);
+apiRouter.use("/records", recordRoutes);
+apiRouter.use("/attachments", attachmentRoutes);
+apiRouter.use("/users", userRoutes);
+apiRouter.use("/audit-logs", auditRoutes);
+apiRouter.use("/resume-ralan", resumeRalanRoutes);
+apiRouter.use("/resume-ranap", resumeRanapRoutes);
+apiRouter.use("/operasi", operasiRoutes);
+apiRouter.use("/resume", resumeRoutes);
+apiRouter.use("/dashboard", dashboardRoutes);
+apiRouter.use("/notifications", notificationRoutes);
 
-app.use("/api/auth", authRoutes);
-app.use("/api/patients", patientRoutes);
-app.use("/api/records", recordRoutes);
-app.use("/api/attachments", attachmentRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/audit-logs", auditRoutes);
-app.use("/api/resume-ralan", resumeRalanRoutes);
-app.use("/api/resume-ranap", resumeRanapRoutes);
-app.use("/api/operasi", operasiRoutes);
-app.use("/api/resume", resumeRoutes);
-app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/notifications", notificationRoutes);
-
-app.get("/api/icd10/search", async (req, res) => {
+apiRouter.get("/icd10/search", async (req, res) => {
   try {
     const q = (req.query.q as string) || "";
     const pattern = `%${q}%`;
@@ -68,7 +62,7 @@ app.get("/api/icd10/search", async (req, res) => {
   }
 });
 
-app.get("/api/icd9/search", async (req, res) => {
+apiRouter.get("/icd9/search", async (req, res) => {
   try {
     const q = (req.query.q as string) || "";
     const pattern = `%${q}%`;
@@ -87,11 +81,21 @@ app.get("/api/icd9/search", async (req, res) => {
   }
 });
 
-// SPA fallback — serve index.html for any non-API route
-const indexPath = path.join(distPath, "index.html");
-if (fs.existsSync(indexPath)) {
-  app.get("*", (_req, res) => res.sendFile(indexPath));
+app.use("/api", apiRouter);
+app.use("/e-dokter/api", apiRouter);
+
+app.get("/ping", (_req, res) => res.json({ status: "ok", timestamp: new Date().toISOString() }));
+
+if (fs.existsSync(distPath)) {
+  app.use("/e-dokter", express.static(distPath));
+
+  const indexPath = path.join(distPath, "index.html");
+  if (fs.existsSync(indexPath)) {
+    app.get("/e-dokter/*", (_req, res) => res.sendFile(indexPath));
+  }
 }
+
+app.get("/", (_req, res) => res.redirect("/e-dokter/"));
 
 app.listen(PORT, () => {
   console.log(`e-Dokter API running on http://localhost:${PORT}`);

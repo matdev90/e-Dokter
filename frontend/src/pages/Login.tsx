@@ -84,7 +84,7 @@ export default function Login() {
           <div className="login-card-header">
             <div className="login-logo-wrap">
               {logoLoaded ? (
-                <img src="/assets/images/logo.png" alt="Logo"
+                <img src={`${import.meta.env.BASE_URL}assets/images/logo.png`} alt="Logo"
                   onError={() => {
                     setLogoLoaded(false);
                     if (logoBase64) {
@@ -161,7 +161,7 @@ export default function Login() {
                   {logoBase64 ? (
                     <img src={logoBase64} alt="" />
                   ) : (
-                    <img src="/assets/images/logo.png" alt=""
+                    <img src={`${import.meta.env.BASE_URL}assets/images/logo.png`} alt=""
                       onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
                   )}
                 </span>
@@ -191,7 +191,7 @@ export default function Login() {
               {logoBase64 ? (
                 <img src={logoBase64} alt="Logo RS" />
               ) : (
-                <img src="/assets/images/logo.png" alt="Logo"
+                <img src={`${import.meta.env.BASE_URL}assets/images/logo.png`} alt="Logo"
                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
               )}
             </div>

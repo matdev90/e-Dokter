@@ -99,7 +99,7 @@ export default function Layout() {
               <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
             </svg>
           ) : (
-            <img src="/assets/images/logo.png" alt="Logo"
+            <img src={`${import.meta.env.BASE_URL}assets/images/logo.png`} alt="Logo"
               style={{ height: 28, marginRight: 8, borderRadius: 4 }}
               onError={() => setLogoError(true)} />
           )}
