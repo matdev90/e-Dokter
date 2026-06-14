@@ -1,7 +1,9 @@
 import axios from "axios";
 
+const BASE = "/e-dokter";
+
 const api = axios.create({
-  baseURL: "/api",
+  baseURL: `${BASE}/api`,
   headers: { "Content-Type": "application/json" },
 });
 
@@ -22,17 +24,17 @@ api.interceptors.response.use(
       const refreshToken = localStorage.getItem("refreshToken");
       if (refreshToken) {
         try {
-          const { data } = await axios.post("/api/auth/refresh", { refreshToken });
+          const { data } = await axios.post(`${BASE}/api/auth/refresh`, { refreshToken });
           localStorage.setItem("accessToken", data.accessToken);
           localStorage.setItem("refreshToken", data.refreshToken);
           original.headers.Authorization = `Bearer ${data.accessToken}`;
           return api(original);
         } catch {
           localStorage.clear();
-          window.location.href = "/login";
+          window.location.href = `${BASE}/login`;
         }
       } else {
-        window.location.href = "/login";
+        window.location.href = `${BASE}/login`;
       }
     }
     return Promise.reject(error);
