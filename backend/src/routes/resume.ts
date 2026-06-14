@@ -226,9 +226,10 @@ router.get("/stats", authenticate, async (req: AuthRequest, res) => {
   }
 });
 
-router.get("/:no_rawat", authenticate, async (req: AuthRequest, res) => {
+router.get("/detail", authenticate, async (req: AuthRequest, res) => {
   try {
-    const no_rawat = req.params.no_rawat;
+    const no_rawat = req.query.no_rawat as string;
+    if (!no_rawat) return res.status(400).json({ error: "no_rawat required" });
 
     const [ralanRows] = await pool.execute(
       `SELECT rp.*, p.nm_pasien, p.no_rkm_medis, p.no_ktp, p.tgl_lahir, p.jk, d.nm_dokter,
@@ -274,9 +275,10 @@ router.get("/:no_rawat", authenticate, async (req: AuthRequest, res) => {
   }
 });
 
-router.delete("/:no_rawat", authenticate, async (req: AuthRequest, res) => {
+router.delete("/by-no-rawat", authenticate, async (req: AuthRequest, res) => {
   try {
-    const no_rawat = req.params.no_rawat;
+    const no_rawat = req.query.no_rawat as string;
+    if (!no_rawat) return res.status(400).json({ error: "no_rawat required" });
 
     const [ralanRows] = await pool.execute("SELECT 1 FROM resume_pasien WHERE no_rawat = ?", [no_rawat]);
     if ((ralanRows as any[]).length > 0) {

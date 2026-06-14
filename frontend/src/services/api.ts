@@ -460,12 +460,12 @@ export async function getResumeList(params?: { q?: string; page?: number; limit?
 }
 
 export async function getResumeDetail(no_rawat: string) {
-  const { data } = await api.get(`/resume/${encodeURIComponent(no_rawat)}`);
+  const { data } = await api.get(`/resume/detail?no_rawat=${encodeURIComponent(no_rawat)}`);
   return data;
 }
 
 export async function deleteResume(no_rawat: string) {
-  const { data } = await api.delete(`/resume/${encodeURIComponent(no_rawat)}`);
+  const { data } = await api.delete(`/resume/by-no-rawat?no_rawat=${encodeURIComponent(no_rawat)}`);
   return data;
 }
 
