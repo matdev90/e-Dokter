@@ -372,7 +372,7 @@ export async function getOperasiStats(params?: { tgl_from?: string; tgl_to?: str
 }
 
 export async function getOperasiDetail(no_rawat: string) {
-  const { data } = await api.get(`/operasi/${encodeURIComponent(no_rawat)}`);
+  const { data } = await api.get(`/operasi/detail?no_rawat=${encodeURIComponent(no_rawat)}`);
   return data;
 }
 
@@ -382,12 +382,12 @@ export async function createOperasi(data_: any) {
 }
 
 export async function updateOperasi(no_rawat: string, data_: any) {
-  const { data } = await api.put(`/operasi/${encodeURIComponent(no_rawat)}`, data_);
+  const { data } = await api.put(`/operasi/update?no_rawat=${encodeURIComponent(no_rawat)}`, data_);
   return data;
 }
 
 export async function signOperasi(no_rawat: string, tanggal: string) {
-  const { data } = await api.post(`/operasi/${encodeURIComponent(no_rawat)}/lock`, { tanggal });
+  const { data } = await api.post(`/operasi/lock?no_rawat=${encodeURIComponent(no_rawat)}`, { tanggal });
   return data;
 }
 
@@ -495,11 +495,11 @@ export async function searchObatOperasi(q: string) {
 }
 
 export async function getBookingOperasi(no_rawat: string) {
-  const { data } = await api.get(`/operasi/booking/${encodeURIComponent(no_rawat)}`);
+  const { data } = await api.get(`/operasi/booking-data?no_rawat=${encodeURIComponent(no_rawat)}`);
   return data;
 }
 
 export async function deleteOperasi(no_rawat: string) {
-  const { data } = await api.delete(`/operasi/${encodeURIComponent(no_rawat)}`);
+  const { data } = await api.delete(`/operasi/remove?no_rawat=${encodeURIComponent(no_rawat)}`);
   return data;
 }

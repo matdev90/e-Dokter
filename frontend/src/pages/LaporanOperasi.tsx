@@ -507,7 +507,7 @@ export default function LaporanOperasi() {
         {loadingStats ? (
           <>
             {[1,2,3,4,5].map((i) => (
-              <div key={i} className="stat-card" style={{ borderRadius: 12, padding: "18px 20px", background: "linear-gradient(135deg, #e5e7eb 0%, #f3f4f6 100%)", position: "relative", overflow: "hidden" }}>
+              <div key={i} className="stat-card stat-shimmer" style={{ borderRadius: 12, padding: "18px 20px", background: "linear-gradient(135deg, #e5e7eb 0%, #f3f4f6 100%)", position: "relative", overflow: "hidden" }}>
                 <div className="shimmer-line" style={{ width: "40%", height: 28, marginBottom: 8 }} />
                 <div className="shimmer-line" style={{ width: "60%", height: 14 }} />
               </div>
@@ -515,7 +515,7 @@ export default function LaporanOperasi() {
           </>
         ) : (
           <>
-            <div className="stat-card" style={{ background: STAT_GRADIENTS[0].bg, borderRadius: 12, padding: "18px 20px", color: "#fff" }}>
+            <div className="stat-card stat-shimmer" style={{ background: STAT_GRADIENTS[0].bg, borderRadius: 12, padding: "18px 20px", color: "#fff" }}>
               <div style={{ fontSize: 28, fontWeight: 700 }}>{operasiStats?.total ?? 0}</div>
               <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4 }}>Total Laporan Operasi</div>
               <div style={{ display: "flex", gap: 12, fontSize: 12, opacity: 0.85, marginTop: 2 }}>
@@ -523,7 +523,7 @@ export default function LaporanOperasi() {
                 <span>Ranap: {operasiStats?.ranap?.total ?? 0}</span>
               </div>
             </div>
-            <div className="stat-card" style={{ background: STAT_GRADIENTS[1].bg, borderRadius: 12, padding: "18px 20px", color: "#fff" }}>
+            <div className="stat-card stat-shimmer" style={{ background: STAT_GRADIENTS[1].bg, borderRadius: 12, padding: "18px 20px", color: "#fff" }}>
               <div style={{ fontSize: 28, fontWeight: 700 }}>{operasiStats?.ralan?.total ?? 0}</div>
               <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4 }}>Rawat Jalan</div>
               <div style={{ display: "flex", gap: 12, fontSize: 12, opacity: 0.85, marginTop: 2 }}>
@@ -531,7 +531,7 @@ export default function LaporanOperasi() {
                 <span>Umum: {operasiStats?.ralan?.umum ?? 0}</span>
               </div>
             </div>
-            <div className="stat-card" style={{ background: STAT_GRADIENTS[2].bg, borderRadius: 12, padding: "18px 20px", color: "#fff" }}>
+            <div className="stat-card stat-shimmer" style={{ background: STAT_GRADIENTS[2].bg, borderRadius: 12, padding: "18px 20px", color: "#fff" }}>
               <div style={{ fontSize: 28, fontWeight: 700 }}>{operasiStats?.ranap?.total ?? 0}</div>
               <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4 }}>Rawat Inap</div>
               <div style={{ display: "flex", gap: 12, fontSize: 12, opacity: 0.85, marginTop: 2 }}>
@@ -539,11 +539,11 @@ export default function LaporanOperasi() {
                 <span>Umum: {operasiStats?.ranap?.umum ?? 0}</span>
               </div>
             </div>
-            <div className="stat-card" style={{ background: STAT_GRADIENTS[3].bg, borderRadius: 12, padding: "18px 20px", color: "#fff" }}>
+            <div className="stat-card stat-shimmer" style={{ background: STAT_GRADIENTS[3].bg, borderRadius: 12, padding: "18px 20px", color: "#fff" }}>
               <div style={{ fontSize: 28, fontWeight: 700 }}>{(operasiStats?.ralan?.bpjs ?? 0) + (operasiStats?.ranap?.bpjs ?? 0)}</div>
               <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4 }}>Total BPJS</div>
             </div>
-            <div className="stat-card" style={{ background: STAT_GRADIENTS[4].bg, borderRadius: 12, padding: "18px 20px", color: "#fff" }}>
+            <div className="stat-card stat-shimmer" style={{ background: STAT_GRADIENTS[4].bg, borderRadius: 12, padding: "18px 20px", color: "#fff" }}>
               <div style={{ fontSize: 28, fontWeight: 700 }}>{(operasiStats?.ralan?.umum ?? 0) + (operasiStats?.ranap?.umum ?? 0)}</div>
               <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4 }}>Total Umum</div>
             </div>
@@ -834,7 +834,7 @@ export default function LaporanOperasi() {
         {loadingStats ? (
           <>
             {[1,2,3,4,5].map((i) => (
-              <div key={i} className="stat-card" style={{ borderRadius: 12, padding: "18px 20px", background: "linear-gradient(135deg, #e5e7eb 0%, #f3f4f6 100%)", position: "relative", overflow: "hidden" }}>
+              <div key={i} className="stat-card stat-shimmer" style={{ borderRadius: 12, padding: "18px 20px", background: "linear-gradient(135deg, #e5e7eb 0%, #f3f4f6 100%)", position: "relative", overflow: "hidden" }}>
                 <div className="shimmer-line" style={{ width: "40%", height: 28, marginBottom: 8 }} />
                 <div className="shimmer-line" style={{ width: "60%", height: 14 }} />
               </div>
@@ -842,7 +842,7 @@ export default function LaporanOperasi() {
           </>
         ) : (
           <>
-            <div className="stat-card" style={{ background: STAT_GRADIENTS[0].bg, borderRadius: 12, padding: "18px 20px", color: "#fff" }}>
+            <div className="stat-card stat-shimmer" style={{ background: STAT_GRADIENTS[0].bg, borderRadius: 12, padding: "18px 20px", color: "#fff" }}>
               <div style={{ fontSize: 28, fontWeight: 700 }}>{operasiStats?.total ?? 0}</div>
               <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4 }}>Total Laporan Operasi</div>
               <div style={{ display: "flex", gap: 12, fontSize: 12, opacity: 0.85, marginTop: 2 }}>
@@ -850,7 +850,7 @@ export default function LaporanOperasi() {
                 <span>Ranap: {operasiStats?.ranap?.total ?? 0}</span>
               </div>
             </div>
-            <div className="stat-card" style={{ background: STAT_GRADIENTS[1].bg, borderRadius: 12, padding: "18px 20px", color: "#fff" }}>
+            <div className="stat-card stat-shimmer" style={{ background: STAT_GRADIENTS[1].bg, borderRadius: 12, padding: "18px 20px", color: "#fff" }}>
               <div style={{ fontSize: 28, fontWeight: 700 }}>{operasiStats?.ralan?.total ?? 0}</div>
               <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4 }}>Rawat Jalan</div>
               <div style={{ display: "flex", gap: 12, fontSize: 12, opacity: 0.85, marginTop: 2 }}>
@@ -858,7 +858,7 @@ export default function LaporanOperasi() {
                 <span>Umum: {operasiStats?.ralan?.umum ?? 0}</span>
               </div>
             </div>
-            <div className="stat-card" style={{ background: STAT_GRADIENTS[2].bg, borderRadius: 12, padding: "18px 20px", color: "#fff" }}>
+            <div className="stat-card stat-shimmer" style={{ background: STAT_GRADIENTS[2].bg, borderRadius: 12, padding: "18px 20px", color: "#fff" }}>
               <div style={{ fontSize: 28, fontWeight: 700 }}>{operasiStats?.ranap?.total ?? 0}</div>
               <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4 }}>Rawat Inap</div>
               <div style={{ display: "flex", gap: 12, fontSize: 12, opacity: 0.85, marginTop: 2 }}>
@@ -866,11 +866,11 @@ export default function LaporanOperasi() {
                 <span>Umum: {operasiStats?.ranap?.umum ?? 0}</span>
               </div>
             </div>
-            <div className="stat-card" style={{ background: STAT_GRADIENTS[3].bg, borderRadius: 12, padding: "18px 20px", color: "#fff" }}>
+            <div className="stat-card stat-shimmer" style={{ background: STAT_GRADIENTS[3].bg, borderRadius: 12, padding: "18px 20px", color: "#fff" }}>
               <div style={{ fontSize: 28, fontWeight: 700 }}>{(operasiStats?.ralan?.bpjs ?? 0) + (operasiStats?.ranap?.bpjs ?? 0)}</div>
               <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4 }}>Total BPJS</div>
             </div>
-            <div className="stat-card" style={{ background: STAT_GRADIENTS[4].bg, borderRadius: 12, padding: "18px 20px", color: "#fff" }}>
+            <div className="stat-card stat-shimmer" style={{ background: STAT_GRADIENTS[4].bg, borderRadius: 12, padding: "18px 20px", color: "#fff" }}>
               <div style={{ fontSize: 28, fontWeight: 700 }}>{(operasiStats?.ralan?.umum ?? 0) + (operasiStats?.ranap?.umum ?? 0)}</div>
               <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4 }}>Total Umum</div>
             </div>
@@ -955,7 +955,7 @@ export default function LaporanOperasi() {
         <div className="patient-grid">
           {list.map((item: any, idx: number) => {
             const initial = (item.nm_pasien || "?")[0].toUpperCase();
-            const colors = ["#2563eb","#16a34a","#f59e0b","#dc2626","#8b5cf6","#ec4899","#06b6d4","#f97316"];
+            const colors = ["#6366f1","#14b8a6","#f97316","#ef4444","#a855f7","#ec4899","#06b6d4","#eab308","#22c55e","#8b5cf6"];
             const color = colors[idx % colors.length];
             return (
               <div key={item.no_rawat} className="patient-card" style={{ animationDelay: `${(idx % limit) * 30}ms` }}>
@@ -998,19 +998,17 @@ export default function LaporanOperasi() {
                     );
                   })()}
                 </div>
-                <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", paddingTop: 10, marginTop: 10, borderTop: "1px solid var(--border)" }}>
-                  <button className="btn btn-outline btn-sm" onClick={() => handlePreview(item.no_rawat)}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <div className="patient-card-actions">
+                  <button className="btn btn-view btn-sm" onClick={() => handlePreview(item.no_rawat)}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                     Lihat
                   </button>
-                  <button className="btn btn-outline btn-sm" onClick={() => handleEditOperasi(item.no_rawat)}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  <button className="btn btn-edit-gradient btn-sm btn-icon-spin" onClick={() => handleEditOperasi(item.no_rawat)}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                     Edit
                   </button>
-                  <button className="btn btn-outline btn-sm"
-                    style={{ color: "var(--danger)", borderColor: "var(--danger)" }}
-                    onClick={() => setConfirmDelete(item.no_rawat)}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                  <button className="btn btn-hapus-gradient btn-sm btn-icon-bounce" onClick={() => setConfirmDelete(item.no_rawat)}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
                     Hapus
                   </button>
                 </div>
@@ -1074,7 +1072,7 @@ export default function LaporanOperasi() {
             </div>
 
             <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
-              <button className="btn btn-primary btn-sm" onClick={() => { const nr = preview.no_rawat; setPreview(null); handleEditOperasi(nr); }}>
+              <button className="btn btn-edit-gradient btn-sm btn-icon-spin" onClick={() => { const nr = preview.no_rawat; setPreview(null); handleEditOperasi(nr); }}>
                 Edit Laporan
               </button>
             </div>
@@ -1162,8 +1160,8 @@ export default function LaporanOperasi() {
               </div>
             </div>
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
-              <button className="btn btn-outline" onClick={() => setEditingModal(null)}>Batal</button>
-              <button className="btn btn-primary" onClick={handleEditOperasiSave} disabled={savingEdit}>{savingEdit ? "Menyimpan..." : "Update"}</button>
+              <button className="btn btn-outline btn-float" onClick={() => setEditingModal(null)}>Batal</button>
+              <button className="btn btn-primary btn-pulse" onClick={handleEditOperasiSave} disabled={savingEdit}>{savingEdit ? "Menyimpan..." : "Update"}</button>
             </div>
           </div>
         </div>

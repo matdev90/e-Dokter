@@ -507,6 +507,32 @@ router.get("/stats", authenticate, async (req: AuthRequest, res) => {
   }
 });
 
+router.get("/detail", authenticate, async (req: AuthRequest, res) => {
+  try {
+    const no_rawat = req.query.no_rawat as string;
+    if (!no_rawat) return res.status(400).json({ error: "no_rawat required" });
+    const [rows] = await pool.execute(
+      `SELECT l.*, o.*, p.nm_pasien, p.no_rkm_medis, d.nm_dokter
+       FROM laporan_operasi l
+       JOIN operasi o ON l.no_rawat = o.no_rawat AND l.tanggal = o.tgl_operasi
+       LEFT JOIN pasien p ON p.no_rkm_medis = (SELECT r.no_rkm_medis FROM reg_periksa r WHERE r.no_rawat = l.no_rawat LIMIT 1)
+       LEFT JOIN dokter d ON o.operator1 = d.kd_dokter
+       WHERE l.no_rawat = ?
+       ORDER BY l.tanggal DESC
+       LIMIT 1`,
+      [no_rawat]
+    );
+    const recs = rows as any[];
+    if (recs.length === 0) {
+      return res.status(404).json({ error: "Laporan operasi not found" });
+    }
+    return res.json(recs[0]);
+  } catch (error) {
+    console.error("Get operasi error:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.get("/:no_rawat", authenticate, async (req: AuthRequest, res) => {
   try {
     const [rows] = await pool.execute(
@@ -714,6 +740,98 @@ router.post("/", authenticate, authorize("doctor"), async (req: AuthRequest, res
     }
   } catch (error) {
     console.error("Create operasi error:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.put("/update", authenticate, authorize("doctor"), async (req: AuthRequest, res) => {
+  try {
+    const no_rawat = req.query.no_rawat as string;
+    if (!no_rawat) return res.status(400).json({ error: "no_rawat required" });
+    const { tanggal } = req.body;
+
+    if (!tanggal) {
+      return res.status(400).json({ error: "tanggal harus diisi" });
+    }
+
+    // Check payment status - block if already paid
+    const [payRows] = await pool.execute(
+      "SELECT status_bayar FROM reg_periksa WHERE no_rawat = ?",
+      [no_rawat]
+    );
+    const payData = (payRows as any[])[0];
+    if (payData && payData.status_bayar === "Sudah Bayar") {
+      return res.status(403).json({ error: "Pasien sudah bayar, tidak dapat mengubah laporan operasi karena dapat menambah tagihan pasien" });
+    }
+
+    const [existing] = await pool.execute(
+      "SELECT no_rawat FROM laporan_operasi WHERE no_rawat = ? AND tanggal = ?",
+      [no_rawat, tanggal]
+    );
+    if ((existing as any[]).length === 0) {
+      return res.status(404).json({ error: "Laporan operasi tidak ditemukan" });
+    }
+
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      // If laporan_operasi is empty, delete the record (matching Java: never keep empty laporan)
+      const laporanText = (req.body.laporan_operasi || "").trim();
+      if (laporanText) {
+        await conn.execute(
+          `UPDATE laporan_operasi SET laporan_operasi = ?, diagnosa_preop = ?, diagnosa_postop = ?, jaringan_dieksekusi = ?, selesaioperasi = ?, permintaan_pa = ?, nomor_implan = ? WHERE no_rawat = ? AND tanggal = ?`,
+          [laporanText, req.body.diagnosa_preop || "", req.body.diagnosa_postop || "", req.body.jaringan_dieksekusi || "", req.body.selesaioperasi || "", req.body.permintaan_pa || "Tidak", req.body.nomor_implan || "", no_rawat, tanggal]
+        );
+      } else {
+        // Remove laporan_operasi record entirely
+        await conn.execute(`DELETE FROM laporan_operasi WHERE no_rawat = ? AND tanggal = ?`, [no_rawat, tanggal]);
+        // Also clean up related billing
+        await conn.execute(`DELETE FROM billing WHERE no_rawat = ? AND pemisah = ':' AND tgl_byr = ?`, [no_rawat, tanggal]);
+      }
+
+      await conn.execute(
+        `UPDATE operasi SET diagnosa_preop = ?, diagnosa_postop = ?, jaringan_dieksekusi = ?, selesaioperasi = ?,
+          operator1 = ?, operator2 = ?, operator3 = ?,
+          asisten_operator1 = ?, asisten_operator2 = ?, asisten_operator3 = ?,
+          instrumen = ?, dokter_anak = ?, perawaat_resusitas = ?,
+          dokter_anestesi = ?, asisten_anestesi = ?, asisten_anestesi2 = ?,
+          bidan = ?, bidan2 = ?, bidan3 = ?, perawat_luar = ?,
+          omloop = ?, omloop2 = ?, omloop3 = ?, omloop4 = ?, omloop5 = ?,
+          dokter_pjanak = ?, dokter_umum = ?
+        WHERE no_rawat = ? AND tgl_operasi = ?`,
+        [
+          req.body.diagnosa_preop || "", req.body.diagnosa_postop || "", req.body.jaringan_dieksekusi || "", req.body.selesaioperasi || "",
+          req.body.operator1 || "", req.body.operator2 || "", req.body.operator3 || "",
+          req.body.asisten_operator1 || "", req.body.asisten_operator2 || "", req.body.asisten_operator3 || "",
+          req.body.instrumen || "", req.body.dokter_anak || "", req.body.perawaat_resusitas || "",
+          req.body.dokter_anestesi || "", req.body.asisten_anestesi || "", req.body.asisten_anestesi2 || "",
+          req.body.bidan || "", req.body.bidan2 || "", req.body.bidan3 || "", req.body.perawat_luar || "",
+          req.body.omloop || "", req.body.omloop2 || "", req.body.omloop3 || "", req.body.omloop4 || "", req.body.omloop5 || "",
+          req.body.dokter_pjanak || "", req.body.dokter_umum || "",
+          no_rawat, tanggal,
+        ]
+      );
+
+      // Replace billing entries
+      await conn.execute(`DELETE FROM billing WHERE no_rawat = ? AND pemisah = ':' AND tgl_byr = ?`, [no_rawat, tanggal]);
+      await conn.commit();
+
+      await logAudit({
+        userId: req.user!.id,
+        action: "update_operasi",
+        entityType: "laporan_operasi",
+        entityId: `${no_rawat}-${tanggal}`,
+        details: `Updated laporan operasi`,
+        ipAddress: req.ip,
+      });
+
+      return res.json({ no_rawat, message: "Laporan operasi updated" });
+    } finally {
+      conn.release();
+    }
+  } catch (error) {
+    console.error("Update operasi error:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -936,6 +1054,44 @@ router.put("/:no_rawat", authenticate, authorize("doctor"), async (req: AuthRequ
   }
 });
 
+router.post("/lock", authenticate, authorize("doctor"), async (req: AuthRequest, res) => {
+  try {
+    const no_rawat = req.query.no_rawat as string;
+    if (!no_rawat) return res.status(400).json({ error: "no_rawat required" });
+    const { tanggal } = req.body;
+
+    if (!tanggal) {
+      return res.status(400).json({ error: "tanggal is required in body" });
+    }
+
+    const [existing] = await pool.execute(
+      "SELECT no_rawat FROM laporan_operasi WHERE no_rawat = ? AND tanggal = ?",
+      [no_rawat, tanggal]
+    );
+    if ((existing as any[]).length === 0) {
+      return res.status(404).json({ error: "Laporan operasi not found" });
+    }
+
+    const seq = Math.floor(Math.random() * 9000) + 1000;
+    const d = new Date(tanggal);
+    const reportNumber = `OP-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${seq}`;
+
+    await logAudit({
+      userId: req.user!.id,
+      action: "sign_operasi",
+      entityType: "laporan_operasi",
+      entityId: `${no_rawat}-${tanggal}`,
+      details: `Signed laporan operasi as ${reportNumber}`,
+      ipAddress: req.ip,
+    });
+
+    return res.json({ no_rawat, tanggal, reportNumber, isLocked: true, message: "Laporan operasi signed" });
+  } catch (error) {
+    console.error("Lock operasi error:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.post("/:no_rawat/lock", authenticate, authorize("doctor"), async (req: AuthRequest, res) => {
   try {
     const no_rawat = req.params.no_rawat;
@@ -1055,6 +1211,25 @@ router.get("/data/obat", authenticate, async (req: AuthRequest, res) => {
 });
 
 // Get booking_operasi data (jadwal operasi) for a patient, with nama_operasi resolved from paket_operasi
+router.get("/booking-data", authenticate, async (req: AuthRequest, res) => {
+  try {
+    const no_rawat = req.query.no_rawat as string;
+    if (!no_rawat) return res.status(400).json({ error: "no_rawat required" });
+    const [rows] = await pool.execute(
+      `SELECT b.*, p.nm_perawatan AS nama_operasi
+       FROM booking_operasi b
+       LEFT JOIN paket_operasi p ON b.kode_paket = p.kode_paket
+       WHERE b.no_rawat = ? ORDER BY b.tanggal DESC, b.jam_mulai DESC LIMIT 1`,
+      [no_rawat]
+    );
+    const data = (rows as any[])[0] || null;
+    return res.json(data);
+  } catch (error) {
+    console.error("Get booking operasi error:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.get("/booking/:no_rawat", authenticate, async (req: AuthRequest, res) => {
   try {
     const [rows] = await pool.execute(
@@ -1073,6 +1248,41 @@ router.get("/booking/:no_rawat", authenticate, async (req: AuthRequest, res) => 
 });
 
 // Delete operasi + laporan_operasi + beri_obat_operasi
+router.delete("/remove", authenticate, authorize("doctor"), async (req: AuthRequest, res) => {
+  const no_rawat = req.query.no_rawat as string;
+  if (!no_rawat) return res.status(400).json({ error: "no_rawat required" });
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [lapRows] = await conn.execute(
+      `SELECT tanggal FROM laporan_operasi WHERE no_rawat = ? ORDER BY tanggal DESC LIMIT 1`,
+      [no_rawat]
+    );
+    const lapData = (lapRows as any[])[0];
+    if (lapData) {
+      await conn.execute(`DELETE FROM laporan_operasi WHERE no_rawat = ? AND tanggal = ?`, [no_rawat, lapData.tanggal]);
+      await conn.execute(`DELETE FROM beri_obat_operasi WHERE no_rawat = ? AND tanggal = ?`, [no_rawat, lapData.tanggal]);
+      await conn.execute(`DELETE FROM operasi WHERE no_rawat = ? AND tgl_operasi = ?`, [no_rawat, lapData.tanggal]);
+    }
+    await conn.commit();
+    await logAudit({
+      userId: req.user!.id,
+      action: "delete_operasi",
+      entityType: "laporan_operasi",
+      entityId: no_rawat,
+      details: `Deleted laporan operasi for ${no_rawat}`,
+      ipAddress: req.ip,
+    });
+    return res.json({ message: "Data operasi berhasil dihapus" });
+  } catch (error) {
+    await conn.rollback();
+    console.error("Delete operasi error:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  } finally {
+    conn.release();
+  }
+});
+
 router.delete("/:no_rawat", authenticate, authorize("doctor"), async (req: AuthRequest, res) => {
   const no_rawat = req.params.no_rawat;
   const conn = await pool.getConnection();
