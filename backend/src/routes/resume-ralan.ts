@@ -40,7 +40,7 @@ router.get("/search-visit", authenticate, async (req: AuthRequest, res) => {
 
     if (q) {
       whereClause += " AND (p.nm_pasien LIKE ? OR rp.no_rkm_medis LIKE ?)";
-      params.push(`%${q}%`, `%${q}%`);
+      const sq = q.replace(/[%_]/g, '\\      params.push(`%${q}%`, `%${q}%`);'); params.push(`%${sq}%`, `%${sq}%`);
     }
 
     if (tgl_from) {

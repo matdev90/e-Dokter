@@ -278,7 +278,7 @@ router.get("/search/patient", authenticate, async (req: AuthRequest, res) => {
     if (!q) {
       return res.status(400).json({ error: "Search query is required" });
     }
-    const pattern = `%${q}%`;
+    const sq = q.replace(/[%_]/g, '\\$&'); const pattern = `%${sq}%`;
     const [rows] = await pool.execute(
       `SELECT o.no_rawat, o.tgl_operasi as tanggal, p.nm_pasien, p.no_rkm_medis
        FROM operasi o
@@ -341,7 +341,7 @@ router.get("/", authenticate, async (req: AuthRequest, res) => {
     let total: number;
 
     if (search) {
-      const pattern = `%${search}%`;
+      const ssearch = search.replace(/[%_]/g, '\\$&'); const pattern = `%${ssearch}%`;
       const [dataRows] = await pool.execute(
         `SELECT ${selectFields}
          FROM laporan_operasi l

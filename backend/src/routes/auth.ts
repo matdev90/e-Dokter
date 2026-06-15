@@ -323,8 +323,13 @@ router.put("/change-password", authenticate, async (req: AuthRequest, res) => {
   }
 });
 
-router.post("/seed", async (_req, res) => {
+router.post("/seed", async (req, res) => {
   try {
+    const ip = req.ip || req.socket.remoteAddress || "";
+    if (ip !== "127.0.0.1" && ip !== "::1" && ip !== "::ffff:127.0.0.1" && !ip.startsWith("::ffff:10.") && !ip.startsWith("::ffff:192.168.")) {
+      return res.status(403).json({ error: "Seed hanya dapat diakses dari localhost" });
+    }
+
     const users = getUsers();
     if (users.find((u: any) => u.email === "admin@specialistcare.id")) {
       return res.json({ message: "Seed data already exists" });
@@ -357,11 +362,12 @@ router.get("/dokter/search", authenticate, async (req: AuthRequest, res) => {
   try {
     const q = (req.query.q as string || "").trim();
     if (q.length < 3) return res.json([]);
+    const sq = q.replace(/[%_]/g, '\\$&');
     const [rows] = await pool.execute(
       `SELECT kd_dokter, nm_dokter FROM dokter
        WHERE nm_dokter LIKE ? OR kd_dokter LIKE ?
        ORDER BY nm_dokter LIMIT 20`,
-      [`%${q}%`, `%${q}%`]
+      [`%${sq}%`, `%${sq}%`]
     );
     return res.json(rows);
   } catch (error) {
@@ -389,8 +395,9 @@ router.get("/pegawai/search", authenticate, async (req: AuthRequest, res) => {
         const idCol = colNames.find((c) =>
           ["nip","nik","id_pegawai","id_karyawan","kd_pegawai","kode"].includes(c)
         );
+        const sq = q.replace(/[%_]/g, '\\$&');
         let sql = `SELECT ${idCol ? idCol+"," : ""} ${nameCol} FROM \`${table}\` WHERE ${nameCol} LIKE ?`;
-        const params: any[] = [`%${q}%`];
+        const params: any[] = [`%${sq}%`];
         if (activeCol) {
           const sampleRows = await pool.query(`SELECT DISTINCT ${activeCol} FROM \`${table}\` LIMIT 5`);
           const vals = (sampleRows[0] as any[]).map((r: any) => String(r[activeCol]).toLowerCase());

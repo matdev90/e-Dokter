@@ -33,6 +33,9 @@ router.post("/", authenticate, authorize("admin"), async (req: AuthRequest, res)
     if (!["doctor", "assistant", "admin"].includes(role)) {
       return res.status(400).json({ error: "Invalid role" });
     }
+    if (role !== "doctor" && password.length < 8) {
+      return res.status(400).json({ error: "Password minimal 8 karakter" });
+    }
 
     const users = getUsers();
     if (users.find((u: any) => u.email === email)) {

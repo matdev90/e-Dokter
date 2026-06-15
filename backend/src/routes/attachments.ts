@@ -103,7 +103,15 @@ router.get("/:id", authenticate, async (req: AuthRequest, res) => {
 
 router.get("/:id/download", authenticate, async (req: AuthRequest, res) => {
   try {
-    return res.download(path.join(UPLOAD_DIR, req.params.id));
+    const fileId = req.params.id;
+    if (fileId.includes("..") || fileId.includes("/") || fileId.includes("\\")) {
+      return res.status(400).json({ error: "Invalid file identifier" });
+    }
+    const filePath = path.join(UPLOAD_DIR, fileId);
+    if (!filePath.startsWith(UPLOAD_DIR)) {
+      return res.status(400).json({ error: "Invalid file identifier" });
+    }
+    return res.download(filePath);
   } catch (error) {
     console.error("Download error:", error);
     return res.status(500).json({ error: "Internal server error" });

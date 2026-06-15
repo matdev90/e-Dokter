@@ -38,7 +38,7 @@ router.get("/", authenticate, async (req: AuthRequest, res) => {
       const conds: string[] = [];
       const p: any[] = [];
       if (dc) { conds.push("rp.kd_dokter = ?"); p.push(dc); }
-      if (q) { conds.push("(p.nm_pasien LIKE ? OR rp.no_rawat LIKE ?)"); p.push(`%${q}%`, `%${q}%`); }
+      if (q) { const sq = q.replace(/[%_]/g, '\\      if (q) { conds.push("(p.nm_pasien LIKE ? OR rp.no_rawat LIKE ?)"); p.push(`%${q}%`, `%${q}%`); }'); conds.push("(p.nm_pasien LIKE ? OR rp.no_rawat LIKE ?)"); p.push(`%${sq}%`, `%${sq}%`); }
       if (tgl_from) { conds.push("reg.tgl_registrasi >= ?"); p.push(tgl_from); }
       if (tgl_to) { conds.push("reg.tgl_registrasi <= ?"); p.push(tgl_to); }
       if (pj) { conds.push("pj.kd_pj = ?"); p.push(pj); }

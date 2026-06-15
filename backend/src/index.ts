@@ -1,6 +1,8 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -23,13 +25,28 @@ const app = express();
 const PORT = parseInt(process.env.PORT || "4000");
 const FRONTEND_URL = process.env.FRONTEND_URL || "";
 
+app.disable("x-powered-by");
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: false,
+}));
 app.use(cors({ origin: FRONTEND_URL || `http://localhost:${PORT}`, credentials: true }));
-app.use(express.json({ limit: "50mb" }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: "Terlalu banyak percobaan login. Coba lagi 15 menit." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 const distPath = path.join(__dirname, "../../frontend/dist");
 
 const apiRouter = express.Router();
+apiRouter.use("/auth/login", loginLimiter);
 apiRouter.use("/auth", authRoutes);
 apiRouter.use("/patients", patientRoutes);
 apiRouter.use("/records", recordRoutes);
@@ -46,7 +63,8 @@ apiRouter.use("/notifications", notificationRoutes);
 apiRouter.get("/icd10/search", async (req, res) => {
   try {
     const q = (req.query.q as string) || "";
-    const pattern = `%${q}%`;
+    const sq = q.replace(/[%_]/g, '\\$&');
+    const pattern = `%${sq}%`;
     const [rows] = await pool.execute(
       `SELECT kd_penyakit AS code, nm_penyakit AS description
        FROM penyakit
@@ -65,7 +83,8 @@ apiRouter.get("/icd10/search", async (req, res) => {
 apiRouter.get("/icd9/search", async (req, res) => {
   try {
     const q = (req.query.q as string) || "";
-    const pattern = `%${q}%`;
+    const sq = q.replace(/[%_]/g, '\\$&');
+    const pattern = `%${sq}%`;
     const [rows] = await pool.execute(
       `SELECT kode AS code, deskripsi_panjang AS description
        FROM icd9

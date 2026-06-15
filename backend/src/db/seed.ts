@@ -4,8 +4,9 @@ import { pool } from "./index";
 
 async function seed() {
   const users = getUsers();
-  if (users.length > 0) {
-    console.log("Seed data already exists (users.json has data)");
+  const hasAdmin = users.some((u: any) => u.role === "admin" || u.role === "assistant");
+  if (hasAdmin) {
+    console.log("Seed data already exists (admin/assistant found in users.json)");
     process.exit(0);
   }
 

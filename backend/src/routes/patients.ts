@@ -19,7 +19,8 @@ router.get("/", authenticate, async (req: AuthRequest, res) => {
     let total: number;
 
     if (search) {
-      const pattern = `%${search}%`;
+      const escaped = search.replace(/[%_]/g, '\\$&');
+      const pattern = `%${escaped}%`;
       const [dataRows] = await pool.execute(
         `SELECT no_rkm_medis, nm_pasien, no_ktp, jk, tmp_lahir, tgl_lahir, alamat, no_tlp, gol_darah, tgl_daftar
          FROM pasien
