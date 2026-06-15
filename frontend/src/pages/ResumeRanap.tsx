@@ -4,7 +4,7 @@ import { searchRanapVisit, getResumeRanap, createResumeRanap, updateResumeRanap,
 import CenteredNotification from "../components/CenteredNotification";
 import IcdAutocompleteInput from "../components/IcdAutocompleteInput";
 
-const LIMIT_OPTIONS = [10, 20, 30, 40, 50];
+const LIMIT_OPTIONS = [12, 24, 36, 48, 60, 0];
 
 export default function ResumeRanap() {
   const navigate = useNavigate();
@@ -12,7 +12,7 @@ export default function ResumeRanap() {
   const [search, setSearch] = useState("");
   const [searchText, setSearchText] = useState("");
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
+  const [limit, setLimit] = useState(12);
   const [totalPages, setTotalPages] = useState(0);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -147,16 +147,19 @@ export default function ResumeRanap() {
 
   const handleContextMenu = (e: React.MouseEvent, visit: any) => {
     e.preventDefault();
-    const willShowResume = !visit.has_resume;
+    const sudahLengkap = visit.has_resume && visit.has_operasi && visit.has_laporan_operasi;
+    if (sudahLengkap) {
+      setNotif({ type: "info", message: "Semua dokumen sudah lengkap", detail: "Untuk melakukan edit data Resume / Laporan Operasi, silahkan buka menu Laporan Resume atau Laporan Operasi." });
+      return;
+    }
+
     const willShowLaporan = (visit.has_booking_operasi || visit.has_operasi) && !visit.has_laporan_operasi;
-    if (willShowLaporan && visit.status_bayar === "Sudah Bayar") {
-      setNotif({ type: "error", message: "Tidak dapat membuat laporan operasi", detail: "Pasien sudah bayar, laporan operasi baru dapat menambah tagihan pasien." });
-      return;
+    const laporanDilarang = willShowLaporan && visit.status_bayar === "Sudah Bayar" && !visit.has_operasi;
+
+    if (laporanDilarang) {
+      setNotif({ type: "error", message: "Tidak dapat membuat laporan operasi", detail: "Pasien sudah bayar dan belum ada data operasi. Input laporan operasi baru akan menambah tagihan pasien." });
     }
-    if (!willShowResume && !willShowLaporan) {
-      setNotif({ type: "info", message: "", detail: "Pasien sudah diresume dan/atau laporan operasi sudah ada. Untuk edit buka menu Laporan Resume atau Laporan Operasi." });
-      return;
-    }
+
     setContextMenu({ x: e.clientX, y: e.clientY, visit });
   };
 
@@ -211,6 +214,8 @@ export default function ResumeRanap() {
           getResumeRanapAutoFill(visit.no_rawat).catch(() => ({})),
         ]);
         setExistingResume(resume);
+        if (fill.nm_dokter_dpjp && !fill.nm_dokter) fill.nm_dokter = fill.nm_dokter_dpjp;
+        if (fill.kd_dokter_dpjp && !fill.kd_dokter) fill.kd_dokter = fill.kd_dokter_dpjp;
         // Merge: auto-fill provides defaults, resume overrides only non-empty values
         const merged = { ...base, ...fill };
         for (const key of Object.keys(resume)) {
@@ -224,7 +229,8 @@ export default function ResumeRanap() {
         merged.cara_keluar = merged.cara_keluar || "Atas Izin Dokter";
         merged.dilanjutkan = merged.dilanjutkan || "Kembali Ke RS";
         setForm(merged);
-      } catch {
+      } catch (err) {
+        console.error("Edit resume load error:", err);
         setError("Gagal memuat data resume");
       }
     } else {
@@ -232,8 +238,11 @@ export default function ResumeRanap() {
       setLoadingForm(true);
       try {
         const fill = await getResumeRanapAutoFill(visit.no_rawat);
+        if (fill.nm_dokter_dpjp && !fill.nm_dokter) fill.nm_dokter = fill.nm_dokter_dpjp;
+        if (fill.kd_dokter_dpjp && !fill.kd_dokter) fill.kd_dokter = fill.kd_dokter_dpjp;
         setForm({ ...base, ...fill, keadaan: fill.keadaan || "Membaik", cara_keluar: fill.cara_keluar || "Atas Izin Dokter", dilanjutkan: fill.dilanjutkan || "Kembali Ke RS" });
-      } catch {
+      } catch (err) {
+        console.error("Auto-fill error:", err);
         setForm(base);
       }
       setLoadingForm(false);
@@ -651,13 +660,14 @@ export default function ResumeRanap() {
 
       {contextMenu && (() => {
         const v = contextMenu.visit;
-        const showResume = !!(!v.has_resume);
+        const resumeAda = !!v.has_resume;
         const showLaporan = !!((v.has_booking_operasi || v.has_operasi) && !v.has_laporan_operasi);
-        if (!showResume && !showLaporan) return null;
+        const laporanDilarang = showLaporan && v.status_bayar === "Sudah Bayar" && !v.has_operasi;
+        const laporanTersedia = showLaporan && !laporanDilarang;
         return (
           <div ref={menuRef} className="context-menu" style={{ position: "fixed", left: contextMenu.x, top: contextMenu.y, zIndex: 1000 }}>
-            {showResume && <button onClick={() => { const w = v; openForm(w, !!w.has_resume); }}>Resume Pasien</button>}
-            {showLaporan && <button onClick={() => { setContextMenu(null); navigate(`/laporan-operasi/${v.no_rawat}`); }}>Laporan Operasi</button>}
+            <button onClick={() => { const w = v; openForm(w, resumeAda); }}>{resumeAda ? "Edit Resume" : "Resume Pasien"}</button>
+            {laporanTersedia && <button onClick={() => { setContextMenu(null); navigate(`/laporan-operasi/${v.no_rawat}`); }}>Laporan Operasi</button>}
           </div>
         );
       })()}
@@ -667,7 +677,7 @@ export default function ResumeRanap() {
         <div className="table-limit">
           <label>Tampilkan</label>
           <select value={limit} onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}>
-            {LIMIT_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+            {LIMIT_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt === 0 ? "Semua" : opt}</option>)}
           </select>
         </div>
       </div>
@@ -684,25 +694,40 @@ export default function ResumeRanap() {
       ) : (
         <div className="patient-grid">
           {list.map((item: any, idx: number) => {
-            const initial = (item.nm_pasien || "?")[0].toUpperCase();
-            const colors = ["#2563eb","#16a34a","#f59e0b","#dc2626","#8b5cf6","#ec4899","#06b6d4","#f97316"];
-            const color = colors[idx % colors.length];
+            const isMale = item.jk === "L";
+            const genderColors = isMale
+              ? { bg: "linear-gradient(135deg,#2563eb,#1e40af)", border: "#2563eb", light: "#dbeafe" }
+              : { bg: "linear-gradient(135deg,#ec4899,#be185d)", border: "#ec4899", light: "#fce7f3" };
             return (
-              <div key={item.no_rawat} className="patient-card" onContextMenu={(e) => handleContextMenu(e, item)} style={{ animationDelay: `${(idx % limit) * 30}ms` }}>
+              <div key={item.no_rawat} className="patient-card" onContextMenu={(e) => handleContextMenu(e, item)} style={{ animationDelay: `${(idx % limit) * 30}ms`, borderLeftColor: genderColors.border }}>
                 <div style={{ position: "absolute", top: ".65rem", right: ".75rem", display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
                   <div className="patient-card-badge" style={{ background: item.has_resume ? "#dcfce7" : "#fef3c7", color: item.has_resume ? "#16a34a" : "#f59e0b" }}>
                     {item.has_resume ? "Sudah Resume" : "Belum Resume"}
                   </div>
                   {item.has_laporan_operasi ? (
                     <div className="patient-card-badge" style={{ background: "#dbeafe", color: "#2563eb" }}>Laporan Operasi Sudah Ada</div>
-                  ) : item.has_booking_operasi ? (
-                    <div className="patient-card-badge" style={{ background: "#fef3c7", color: "#d97706" }}>Belum Ada Laporan Operasi</div>
                   ) : item.has_operasi ? (
                     <div className="patient-card-badge" style={{ background: "#f3e8ff", color: "#9333ea" }}>Sudah Operasi</div>
                   ) : null}
+                  {!item.has_laporan_operasi && (item.has_booking_operasi || item.has_operasi) ? (
+                    <div className="patient-card-badge" style={{ background: "#fef3c7", color: "#d97706" }}>Belum Ada Laporan Operasi</div>
+                  ) : null}
                 </div>
                 <div className="patient-card-main">
-                  <div className="patient-avatar" style={{ background: color }}>{initial}</div>
+                  <div className="patient-avatar" style={{ background: genderColors.bg }}>
+                    {isMale ? (
+                      <svg viewBox="0 0 32 32" fill="currentColor" width="30" height="30">
+                        <circle cx="16" cy="7" r="5"/>
+                        <path d="M6 17c0-4 4.5-7 10-7s10 3 10 7v4c0 4-4.5 7-10 7s-10-3-10-7z"/>
+                        <path d="M10 24l6 5 6-5"/>
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 32 32" fill="currentColor" width="30" height="30">
+                        <circle cx="16" cy="7" r="5"/>
+                        <path d="M16 13l-12 19h24z"/>
+                      </svg>
+                    )}
+                  </div>
                   <div className="patient-details">
                     <div className="patient-name">{item.nm_pasien || "-"}</div>
                     <div className="patient-meta">
@@ -712,6 +737,29 @@ export default function ResumeRanap() {
                     </div>
                     <div className="patient-meta text-muted">
                       <span>{item.tgl_registrasi ? new Date(item.tgl_registrasi).toLocaleDateString("id-ID", { weekday: "long", year: "numeric", month: "long", day: "numeric" }) : "-"}</span>
+                      {item.status_bayar && (
+                        <span style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          marginLeft: 8,
+                          padding: "1px 8px",
+                          borderRadius: 10,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          background: item.status_bayar === "Sudah Bayar" ? "#dcfce7" : "#fef3c7",
+                          color: item.status_bayar === "Sudah Bayar" ? "#16a34a" : "#d97706"
+                        }}>
+                          <span style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: "50%",
+                            background: item.status_bayar === "Sudah Bayar" ? "#16a34a" : "#d97706",
+                            display: "inline-block"
+                          }} />
+                          {item.status_bayar}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

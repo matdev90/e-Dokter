@@ -1,6 +1,10 @@
 import { Router } from "express";
 import { pool } from "../db";
 import { authenticate, authorize, AuthRequest, logAudit } from "../middleware/auth";
+import fs from "node:fs";
+
+const DEBUG_LOG = "/tmp/opencode-debug.log";
+const dlog = (msg: string) => { try { fs.appendFileSync(DEBUG_LOG, `[operasi-af] ${msg}\n`); } catch {} };
 
 const router = Router();
 
@@ -66,9 +70,11 @@ async function insertBillingOperasi(conn: any, no_rawat: string, tgl_operasi: st
   }
 }
 
-router.get("/auto-fill/*", authenticate, async (req: AuthRequest, res) => {
+router.get("/auto-fill", authenticate, async (req: AuthRequest, res) => {
+  dlog("=== auto-fill called ===");
   try {
-    const no_rawat = req.params[0] as string;
+    const no_rawat = (req.query.no_rawat || req.params[0] || "") as string;
+    dlog(`no_rawat=${no_rawat} req.path=${req.path} req.url=${req.url}`);
     const result: any = {};
 
     // 1. Patient info from reg_periksa + pasien
@@ -229,11 +235,12 @@ router.get("/auto-fill/*", authenticate, async (req: AuthRequest, res) => {
     }
 
     // 5. Resolve doctor codes to names
-    if (result.operator1 && !result.operator1.includes(" - ")) {
+    const op1 = result.operator1 != null ? String(result.operator1) : "";
+    if (op1 && !op1.includes(" - ")) {
       try {
         const [dr] = await pool.execute(
           "SELECT nm_dokter FROM dokter WHERE kd_dokter = ? LIMIT 1",
-          [result.operator1]
+          [op1]
         );
         const drData = (dr as any[])[0];
         if (drData) result.operator1_nama = drData.nm_dokter;
@@ -243,7 +250,8 @@ router.get("/auto-fill/*", authenticate, async (req: AuthRequest, res) => {
     // 6. Resolve employee/petugas codes to names
     const employeeFields = ['asisten_operator1','asisten_operator2','asisten_operator3','bidan','bidan2','bidan3'];
     for (const field of employeeFields) {
-      const val = result[field];
+      const raw = result[field];
+      const val = raw != null ? String(raw) : "";
       if (val && val !== '-' && !val.includes(' - ')) {
         try {
           const [petRows] = await pool.execute(
@@ -266,9 +274,9 @@ router.get("/auto-fill/*", authenticate, async (req: AuthRequest, res) => {
     }
 
     return res.json(result);
-  } catch (error) {
-    console.error("Auto-fill operasi error:", error);
-    return res.status(500).json({ error: "Internal server error" });
+  } catch (error: any) {
+    console.error("Auto-fill operasi error:", error?.message || error);
+    return res.json(result);
   }
 });
 
@@ -533,7 +541,10 @@ router.get("/detail", authenticate, async (req: AuthRequest, res) => {
   }
 });
 
-router.get("/:no_rawat", authenticate, async (req: AuthRequest, res) => {
+router.get("/:no_rawat", authenticate, async (req: AuthRequest, res, next) => {
+  const { no_rawat } = req.params;
+  // Skip if no_rawat doesn't look like a real medical record ID (YYYY/MM/DD/xxxx)
+  if (!/^\d{4}\/\d{2}\/\d{2}\/\d+$/.test(no_rawat)) return next("route");
   try {
     const [rows] = await pool.execute(
       `SELECT l.*, o.*, p.nm_pasien, p.no_rkm_medis, d.nm_dokter

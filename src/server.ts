@@ -1,7 +1,7 @@
 import express from "express";
 
 const app = express();
-const PORT = parseInt(process.env.PORT || "3000");
+const PORT = parseInt(process.env.PORT || "4000");
 
 app.get("/ping", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });

@@ -137,7 +137,7 @@ export default function Login() {
               <div className="login-input-wrap">
                 <input type={showPassword ? "text" : "password"} value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Masukkan password" required />
+                  placeholder="Password" required />
                 <button type="button" className="login-password-toggle" onClick={() => setShowPassword(!showPassword)} tabIndex={-1}>
                   {showPassword ? (
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

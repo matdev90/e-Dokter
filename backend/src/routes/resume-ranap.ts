@@ -53,9 +53,10 @@ router.get("/stats", authenticate, async (req: AuthRequest, res) => {
 router.get("/search-visit", authenticate, async (req: AuthRequest, res) => {
   try {
     const q = (req.query.q as string) || "";
-    const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit as string) || 10));
-    const offset = (page - 1) * limit;
+    const rawLimit = parseInt(req.query.limit as string);
+    const limit = rawLimit === 0 ? 0 : Math.max(1, Math.min(100, rawLimit || 12));
+    const page = limit > 0 ? Math.max(1, parseInt(req.query.page as string) || 1) : 1;
+    const offset = (page - 1) * Math.max(limit, 1);
     const tgl_from = (req.query.tgl_from as string) || "";
     const tgl_to = (req.query.tgl_to as string) || "";
     const kd_pj = (req.query.kd_pj as string) || "";
@@ -125,9 +126,8 @@ router.get("/search-visit", authenticate, async (req: AuthRequest, res) => {
     );
     const total = (countRows as any[])[0].total;
 
-    const [rows] = await pool.execute(
-      `SELECT rp.no_rawat, rp.tgl_registrasi, rp.jam_reg, rp.no_rkm_medis,
-               p.nm_pasien, p.alamat, d.nm_dokter, rp.kd_poli, rp.status_lanjut,
+    let sql = `SELECT rp.no_rawat, rp.tgl_registrasi, rp.jam_reg, rp.no_rkm_medis,
+               p.nm_pasien, p.alamat, p.jk, d.nm_dokter, rp.kd_poli, rp.status_lanjut,
                rp.stts, rp.status_bayar,
               latest_kamar.kd_kamar, latest_kamar.nm_kamar AS nm_bangsal,
               CASE WHEN res.no_rawat IS NOT NULL THEN 1 ELSE 0 END as has_resume,
@@ -141,18 +141,21 @@ router.get("/search-visit", authenticate, async (req: AuthRequest, res) => {
        ${kamarJoin}
        LEFT JOIN resume_pasien_ranap res ON rp.no_rawat = res.no_rawat
        ${whereClause}
-        ORDER BY rp.tgl_registrasi DESC, rp.jam_reg DESC
-       LIMIT ? OFFSET ?`,
-      [...params, String(limit), String(offset)]
-    );
+        ORDER BY rp.tgl_registrasi DESC, rp.jam_reg DESC`;
+    const sqlParams = [...params];
+    if (limit > 0) {
+      sql += ` LIMIT ? OFFSET ?`;
+      sqlParams.push(String(limit), String(offset));
+    }
+    const [rows] = await pool.execute(sql, sqlParams);
 
     return res.json({
       data: rows,
       pagination: {
-        page,
+        page: limit > 0 ? page : 1,
         limit,
         total,
-        totalPages: Math.ceil(total / limit),
+        totalPages: limit > 0 ? Math.ceil(total / limit) : 1,
       },
     });
   } catch (error) {
@@ -356,12 +359,21 @@ router.put("/:no_rawat", authenticate, async (req: AuthRequest, res) => {
   }
 });
 
-router.get("/auto-fill/:no_rawat", authenticate, async (req: AuthRequest, res) => {
-  try {
-    const { no_rawat } = req.params;
-    const result: any = {};
+router.get("/auto-fill", authenticate, async (req: AuthRequest, res) => {
+  const no_rawat = (req.query.no_rawat || "") as string;
+  if (!no_rawat) return res.status(400).json({ error: "no_rawat required" });
+  const result: any = {};
+  const errs: string[] = [];
 
-    // 1. DPJP (Dokter Penanggung Jawab Pelayanan)
+  const safeQuery = async (name: string, fn: () => Promise<void>) => {
+    try { await fn(); } catch (e: any) {
+      console.error(`Auto-fill step [${name}] error:`, e?.message || e);
+      errs.push(name);
+    }
+  };
+
+  // 1. DPJP (Dokter Penanggung Jawab Pelayanan) — try dpjp_ranap first, fallback to reg_periksa.kd_dokter
+  await safeQuery("dpjp", async () => {
     const [dpjpRows] = await pool.execute(
       `SELECT dp.kd_dokter, d.nm_dokter
        FROM dpjp_ranap dp
@@ -371,12 +383,28 @@ router.get("/auto-fill/:no_rawat", authenticate, async (req: AuthRequest, res) =
       [no_rawat]
     );
     const dpjpData = (dpjpRows as any[])[0];
-    if (dpjpData) {
-      result.kd_dokter_dpjp = dpjpData.kd_dokter || "";
+    if (dpjpData && dpjpData.kd_dokter) {
+      result.kd_dokter_dpjp = dpjpData.kd_dokter;
       result.nm_dokter_dpjp = dpjpData.nm_dokter || "";
+    } else {
+      const [regDoc] = await pool.execute(
+        `SELECT rp.kd_dokter, d.nm_dokter
+         FROM reg_periksa rp
+         LEFT JOIN dokter d ON rp.kd_dokter = d.kd_dokter
+         WHERE rp.no_rawat = ?
+         LIMIT 1`,
+        [no_rawat]
+      );
+      const regDocData = (regDoc as any[])[0];
+      if (regDocData && regDocData.kd_dokter) {
+        result.kd_dokter_dpjp = regDocData.kd_dokter;
+        result.nm_dokter_dpjp = regDocData.nm_dokter || "";
+      }
     }
+  });
 
-    // 2. Diagnosa Awal + kamar_inap info
+  // 2. Diagnosa Awal + kamar_inap info
+  await safeQuery("kamar", async () => {
     const [kamarRows] = await pool.execute(
       `SELECT kamar_inap.diagnosa_awal, kamar_inap.kd_kamar, bangsal.nm_bangsal,
               kamar_inap.tgl_masuk, kamar_inap.jam_masuk,
@@ -404,10 +432,27 @@ router.get("/auto-fill/:no_rawat", authenticate, async (req: AuthRequest, res) =
       result.kd_dokter_pengirim = kamarData.kd_dokter_pengirim || "";
       result.nm_dokter_pengirim = kamarData.nm_dokter_pengirim || "";
     }
+    // Fallback dokter_pengirim from reg_periksa
+    if (!result.kd_dokter_pengirim) {
+      const [regDoc] = await pool.execute(
+        `SELECT rp.kd_dokter, d.nm_dokter
+         FROM reg_periksa rp
+         LEFT JOIN dokter d ON rp.kd_dokter = d.kd_dokter
+         WHERE rp.no_rawat = ?
+         LIMIT 1`,
+        [no_rawat]
+      );
+      const regDocData = (regDoc as any[])[0];
+      if (regDocData && regDocData.kd_dokter) {
+        result.kd_dokter_pengirim = regDocData.kd_dokter;
+        result.nm_dokter_pengirim = regDocData.nm_dokter || "";
+      }
+    }
+  });
 
-    // 3. Anamnesis (keluhan_utama) & Pemeriksaan Fisik — cascade from multiple sources
+  // 3. Anamnesis (keluhan_utama) & Pemeriksaan Fisik — cascade from multiple sources
+  await safeQuery("anamnesis", async () => {
     const sources = [
-      // a. penilaian_medis_ranap
       () => pool.execute(
         `SELECT keluhan_utama,
                 TRIM(CONCAT(
@@ -418,7 +463,6 @@ router.get("/auto-fill/:no_rawat", authenticate, async (req: AuthRequest, res) =
          ORDER BY tanggal DESC LIMIT 1`,
         [no_rawat]
       ),
-      // b. pemeriksaan_ranap
       () => pool.execute(
         `SELECT keluhan AS keluhan_utama,
                 TRIM(CONCAT(
@@ -429,7 +473,6 @@ router.get("/auto-fill/:no_rawat", authenticate, async (req: AuthRequest, res) =
          ORDER BY tgl_perawatan DESC, jam_rawat DESC LIMIT 1`,
         [no_rawat]
       ),
-      // c. penilaian_medis_igd
       () => pool.execute(
         `SELECT keluhan_utama,
                 TRIM(CONCAT(
@@ -440,7 +483,6 @@ router.get("/auto-fill/:no_rawat", authenticate, async (req: AuthRequest, res) =
          ORDER BY tanggal DESC LIMIT 1`,
         [no_rawat]
       ),
-      // d. pemeriksaan_ralan
       () => pool.execute(
         `SELECT keluhan AS keluhan_utama,
                 TRIM(CONCAT(
@@ -451,7 +493,6 @@ router.get("/auto-fill/:no_rawat", authenticate, async (req: AuthRequest, res) =
          ORDER BY tgl_perawatan DESC, jam_rawat DESC LIMIT 1`,
         [no_rawat]
       ),
-      // e. triase igd (data_triase_igdprimer + data_triase_igd)
       () => pool.execute(
         `SELECT p.keluhan_utama,
                 TRIM(CONCAT(
@@ -464,26 +505,39 @@ router.get("/auto-fill/:no_rawat", authenticate, async (req: AuthRequest, res) =
         [no_rawat]
       ),
     ];
-    // Cascade keluhan_utama from first source that has it
     for (const source of sources) {
       const [rows] = await source();
       const data = (rows as any[])[0];
-      if (data?.keluhan_utama) {
-        result.keluhan_utama = data.keluhan_utama;
-        break;
-      }
+      if (data?.keluhan_utama) { result.keluhan_utama = data.keluhan_utama; break; }
     }
-    // Cascade pemeriksaan_fisik from first source that has it
     for (const source of sources) {
       const [rows] = await source();
       const data = (rows as any[])[0];
-      if (data?.pemeriksaan_fisik) {
-        result.pemeriksaan_fisik = data.pemeriksaan_fisik;
-        break;
-      }
+      if (data?.pemeriksaan_fisik) { result.pemeriksaan_fisik = data.pemeriksaan_fisik; break; }
     }
+  });
 
-    // 4. Pemeriksaan Penunjang — from hasil_radiologi + periksa_radiologi + jns_perawatan_radiologi
+  // 3b. Jalannya Penyakit — from penilaian_medis_ranap SOAP notes chronology
+  await safeQuery("jalannya_penyakit", async () => {
+    const [jpRows] = await pool.execute(
+      `SELECT CONCAT(
+        '[', DATE_FORMAT(tanggal, '%d/%m/%Y %H:%i'), '] ',
+        COALESCE(CONCAT('S: ', subyektif, '\n'), ''),
+        COALESCE(CONCAT('O: ', obyektif, '\n'), ''),
+        COALESCE(CONCAT('A: ', asesmen, '\n'), ''),
+        COALESCE(CONCAT('P: ', plan, '\n'), '')
+      ) AS catatan
+       FROM SOAP WHERE no_rawat = ?
+       ORDER BY tanggal DESC
+       LIMIT 50`,
+      [no_rawat]
+    );
+    const jpVals = (jpRows as any[]).map((r: any) => r.catatan).filter(Boolean);
+    if (jpVals.length > 0) result.jalannya_penyakit = jpVals.join("\n---\n");
+  });
+
+  // 4. Pemeriksaan Penunjang
+  await safeQuery("penunjang", async () => {
     const [radRows] = await pool.execute(
       `SELECT CONCAT('Pemeriksaan: ', jns.nm_perawatan, '\nHasil: ', hr.hasil) AS val
        FROM hasil_radiologi hr
@@ -495,8 +549,10 @@ router.get("/auto-fill/:no_rawat", authenticate, async (req: AuthRequest, res) =
     );
     const radVals = (radRows as any[]).map((r: any) => r.val).filter(Boolean);
     if (radVals.length > 0) result.pemeriksaan_penunjang = radVals.join("\n\n---\n\n");
+  });
 
-    // 5. Hasil Laborat
+  // 5. Hasil Laborat
+  await safeQuery("laborat", async () => {
     const [labRows] = await pool.execute(
       `SELECT CONCAT(template_laboratorium.Pemeriksaan, ' : ', detail_periksa_lab.nilai,
                     IF(template_laboratorium.satuan != '' AND template_laboratorium.satuan IS NOT NULL, CONCAT(' ', template_laboratorium.satuan), ''),
@@ -510,8 +566,10 @@ router.get("/auto-fill/:no_rawat", authenticate, async (req: AuthRequest, res) =
     );
     const labVals = (labRows as any[]).map((r: any) => r.val).filter(Boolean);
     if (labVals.length > 0) result.hasil_laborat = labVals.join("\n");
+  });
 
-    // 6. Tindakan & Operasi — from prosedur_pasien
+  // 6. Tindakan & Operasi
+  await safeQuery("tindakan", async () => {
     const [tindakanRows] = await pool.execute(
       `SELECT CONCAT(icd9.deskripsi_panjang) AS val
        FROM prosedur_pasien
@@ -522,8 +580,10 @@ router.get("/auto-fill/:no_rawat", authenticate, async (req: AuthRequest, res) =
     );
     const tindakanVals = (tindakanRows as any[]).map((r: any) => r.val).filter(Boolean);
     if (tindakanVals.length > 0) result.tindakan_dan_operasi = tindakanVals.join("\n");
+  });
 
-    // 7. Obat di RS — from resep_dokter
+  // 7. Obat di RS
+  await safeQuery("obat_rs", async () => {
     const [obatRsRows] = await pool.execute(
       `SELECT CONCAT(databarang.nama_brng, ' : ', resep_dokter.jml, ' - ', resep_dokter.aturan_pakai) AS val
        FROM resep_obat
@@ -535,8 +595,10 @@ router.get("/auto-fill/:no_rawat", authenticate, async (req: AuthRequest, res) =
     );
     const obatRsVals = (obatRsRows as any[]).map((r: any) => r.val).filter(Boolean);
     if (obatRsVals.length > 0) result.obat_di_rs = obatRsVals.join("\n");
+  });
 
-    // 8. Diagnosa Pasien (prioritas 1-5)
+  // 8. Diagnosa Pasien (prioritas 1-5)
+  await safeQuery("diagnosa", async () => {
     const [diagRows] = await pool.execute(
       `SELECT diagnosa_pasien.kd_penyakit, penyakit.nm_penyakit, diagnosa_pasien.prioritas
        FROM diagnosa_pasien
@@ -547,24 +609,21 @@ router.get("/auto-fill/:no_rawat", authenticate, async (req: AuthRequest, res) =
     );
     for (const d of diagRows as any[]) {
       if (d.prioritas === 1) {
-        result.kd_diagnosa_utama = d.kd_penyakit;
-        result.diagnosa_utama = d.nm_penyakit;
+        result.kd_diagnosa_utama = d.kd_penyakit; result.diagnosa_utama = d.nm_penyakit;
       } else if (d.prioritas === 2) {
-        result.kd_diagnosa_sekunder = d.kd_penyakit;
-        result.diagnosa_sekunder = d.nm_penyakit;
+        result.kd_diagnosa_sekunder = d.kd_penyakit; result.diagnosa_sekunder = d.nm_penyakit;
       } else if (d.prioritas === 3) {
-        result.kd_diagnosa_sekunder2 = d.kd_penyakit;
-        result.diagnosa_sekunder2 = d.nm_penyakit;
+        result.kd_diagnosa_sekunder2 = d.kd_penyakit; result.diagnosa_sekunder2 = d.nm_penyakit;
       } else if (d.prioritas === 4) {
-        result.kd_diagnosa_sekunder3 = d.kd_penyakit;
-        result.diagnosa_sekunder3 = d.nm_penyakit;
+        result.kd_diagnosa_sekunder3 = d.kd_penyakit; result.diagnosa_sekunder3 = d.nm_penyakit;
       } else if (d.prioritas === 5) {
-        result.kd_diagnosa_sekunder4 = d.kd_penyakit;
-        result.diagnosa_sekunder4 = d.nm_penyakit;
+        result.kd_diagnosa_sekunder4 = d.kd_penyakit; result.diagnosa_sekunder4 = d.nm_penyakit;
       }
     }
+  });
 
-    // 9. Prosedur Pasien (prioritas 1-4)
+  // 9. Prosedur Pasien (prioritas 1-4)
+  await safeQuery("prosedur", async () => {
     const [proRows] = await pool.execute(
       `SELECT prosedur_pasien.kode, icd9.deskripsi_panjang, prosedur_pasien.prioritas
        FROM prosedur_pasien
@@ -575,21 +634,19 @@ router.get("/auto-fill/:no_rawat", authenticate, async (req: AuthRequest, res) =
     );
     for (const p of proRows as any[]) {
       if (p.prioritas === 1) {
-        result.kd_prosedur_utama = p.kode;
-        result.prosedur_utama = p.deskripsi_panjang;
+        result.kd_prosedur_utama = p.kode; result.prosedur_utama = p.deskripsi_panjang;
       } else if (p.prioritas === 2) {
-        result.kd_prosedur_sekunder = p.kode;
-        result.prosedur_sekunder = p.deskripsi_panjang;
+        result.kd_prosedur_sekunder = p.kode; result.prosedur_sekunder = p.deskripsi_panjang;
       } else if (p.prioritas === 3) {
-        result.kd_prosedur_sekunder2 = p.kode;
-        result.prosedur_sekunder2 = p.deskripsi_panjang;
+        result.kd_prosedur_sekunder2 = p.kode; result.prosedur_sekunder2 = p.deskripsi_panjang;
       } else if (p.prioritas === 4) {
-        result.kd_prosedur_sekunder3 = p.kode;
-        result.prosedur_sekunder3 = p.deskripsi_panjang;
+        result.kd_prosedur_sekunder3 = p.kode; result.prosedur_sekunder3 = p.deskripsi_panjang;
       }
     }
+  });
 
-    // 10. Obat Pulang — from resep_dokter pulang
+  // 10. Obat Pulang
+  await safeQuery("obat_pulang", async () => {
     const [obatPlgRows] = await pool.execute(
       `SELECT CONCAT(databarang.nama_brng, ' : ', resep_dokter.jml, ' - ', resep_dokter.aturan_pakai) AS val
        FROM resep_obat
@@ -601,12 +658,10 @@ router.get("/auto-fill/:no_rawat", authenticate, async (req: AuthRequest, res) =
     );
     const obatPlgVals = (obatPlgRows as any[]).map((r: any) => r.val).filter(Boolean);
     if (obatPlgVals.length > 0) result.obat_pulang = obatPlgVals.join("\n");
+  });
 
-    return res.json(result);
-  } catch (error) {
-    console.error("Auto-fill error:", error);
-    return res.status(500).json({ error: "Internal server error" });
-  }
+  if (errs.length > 0) console.error("Auto-fill partial errors:", errs);
+  return res.json(result);
 });
 
 router.get("/bangsal", authenticate, async (_req: AuthRequest, res) => {

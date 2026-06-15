@@ -808,19 +808,18 @@ tr { transition: background .1s; }
 .patient-card {
   background: var(--surface);
   border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
   border-radius: var(--radius-lg);
   padding: 1rem 1.1rem;
-  box-shadow: var(--shadow);
+  box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 2px 8px rgba(0,0,0,.03);
   cursor: context-menu;
-  transition: var(--transition);
+  transition: all .25s ease;
   position: relative;
   animation: fadeIn .35s ease both;
 }
-
 .patient-card:hover {
-  border-color: var(--primary);
-  box-shadow: 0 3px 12px rgba(37,99,235,.1);
-  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(37,99,235,.1), 0 2px 8px rgba(0,0,0,.04);
+  transform: translateY(-3px);
 }
 
 .patient-card-badge {
@@ -839,22 +838,31 @@ tr { transition: background .1s; }
 }
 
 .patient-avatar {
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: 1rem;
-  color: #fff;
   flex-shrink: 0;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  animation: avatarFloat 3s ease-in-out infinite;
+  color: #fff;
+  position: relative;
+}
+.patient-avatar svg {
+  width: 26px;
+  height: 26px;
+}
+@keyframes avatarFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
 }
 .patient-card:hover .patient-avatar {
-  transform: scale(1.1);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  transform: scale(1.12) translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+  animation-play-state: paused;
 }
 
 .patient-details {
@@ -1921,20 +1929,74 @@ tr { transition: background .1s; }
   .dash-header-content { flex-direction: column; gap: .75rem; align-items: flex-start; }
 }
 
-/* ─── Responsive ─── */
+/* ─── Sidebar Close Button (mobile) ─── */
+.sidebar-close {
+  display: none;
+  align-self: flex-end;
+  background: none;
+  border: none;
+  color: var(--sidebar-text);
+  padding: .4rem;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: var(--transition);
+}
+.sidebar-close:hover {
+  background: rgba(255,255,255,.1);
+  color: #fff;
+}
+
+/* ─── Sidebar Backdrop (mobile overlay) ─── */
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 199;
+  animation: fadeIn .2s ease;
+}
 @media (max-width: 768px) {
   .layout { grid-template-columns: 1fr; grid-template-rows: 56px 1fr; }
-  .sidebar { display: none; }
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    max-width: 85vw;
+    z-index: 200;
+    transform: translateX(-100%);
+    transition: transform .25s cubic-bezier(.16,1,.3,1);
+    grid-row: auto;
+  }
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+  .sidebar-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: .25rem;
+  }
+  .sidebar-collapsed .sidebar {
+    grid-template-columns: 1fr;
+  }
   .charts-grid { grid-template-columns: 1fr; }
   .profile-layout { grid-template-columns: 1fr; }
   .stats-row { grid-template-columns: 1fr 1fr; }
   .form-row { grid-template-columns: 1fr; }
 }
 
+@media (max-width: 640px) {
+  .topnavbar { padding: 0 .75rem; }
+  .topnavbar-left { gap: .4rem; }
+  .brand-separator, .brand-sub { display: none; }
+}
 @media (max-width: 480px) {
   .stats-row { grid-template-columns: 1fr; }
   .page-header { flex-direction: column; gap: .5rem; }
   .profile-info { display: none; }
+  .topnavbar { padding: 0 .5rem; }
+  .topnavbar-left { gap: .2rem; }
 }
 
 /* ─── Recent Patients Table ─── */

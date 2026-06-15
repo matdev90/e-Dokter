@@ -20,7 +20,14 @@ const STAT_GRADIENTS = [
 
 export default function LaporanOperasi() {
   const params = useParams();
-  const no_rawat = params['*'] ? params['*'].replace(/^\//, '') : undefined;
+  const no_rawat = (() => {
+    const p = params['*'];
+    if (p && p.includes('/')) return p;
+    if (p) return p.replace(/^\//, '');
+    // Fallback: extract from pathname
+    const m = window.location.pathname.match(/\/laporan-operasi\/(.+)/);
+    return m ? decodeURIComponent(m[1]) : undefined;
+  })();
   const navigate = useNavigate();
   const [view, setView] = useState<"list" | "form">(no_rawat ? "form" : "list");
   const [list, setList] = useState<any[]>([]);
@@ -200,7 +207,7 @@ export default function LaporanOperasi() {
               setPostOpQuery(m ? `${m.code} - ${m.description}` : detail.diagnosa_postop);
             }).catch(() => setPostOpQuery(detail.diagnosa_postop));
           }
-        } else if (fill) {
+        } else if (fill && typeof fill === 'object' && Object.keys(fill).length > 0 && fill.no_rawat) {
           setHasExisting(false);
           const merged = { ...fill };
           if (namaOperasi) merged.nama_operasi = namaOperasi;

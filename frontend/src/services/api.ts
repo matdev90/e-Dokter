@@ -237,7 +237,7 @@ export async function searchRalanVisit(params_: {
   const sp = new URLSearchParams();
   if (params_.q) sp.set("q", params_.q);
   if (params_.page) sp.set("page", String(params_.page));
-  if (params_.limit) sp.set("limit", String(params_.limit));
+  if (params_.limit !== undefined) sp.set("limit", String(params_.limit));
   if (params_.tgl_from) sp.set("tgl_from", params_.tgl_from);
   if (params_.tgl_to) sp.set("tgl_to", params_.tgl_to);
   if (params_.kd_pj) sp.set("kd_pj", params_.kd_pj);
@@ -277,7 +277,7 @@ export async function updateResumeRalan(no_rawat: string, data_: any) {
 }
 
 export async function getResumeRalanAutoFill(no_rawat: string) {
-  const { data } = await api.get(`/resume-ralan/auto-fill/${encodeURIComponent(no_rawat)}`);
+  const { data } = await api.get(`/resume-ralan/auto-fill?no_rawat=${encodeURIComponent(no_rawat)}`);
   return data;
 }
 
@@ -293,7 +293,7 @@ export async function searchRanapVisit(params_: {
   const sp = new URLSearchParams();
   if (params_.q) sp.set("q", params_.q);
   if (params_.page) sp.set("page", String(params_.page));
-  if (params_.limit) sp.set("limit", String(params_.limit));
+  if (params_.limit !== undefined) sp.set("limit", String(params_.limit));
   if (params_.tgl_from) sp.set("tgl_from", params_.tgl_from);
   if (params_.tgl_to) sp.set("tgl_to", params_.tgl_to);
   if (params_.kd_pj) sp.set("kd_pj", params_.kd_pj);
@@ -328,7 +328,7 @@ export async function updateResumeRanap(no_rawat: string, data_: any) {
 }
 
 export async function getResumeRanapAutoFill(no_rawat: string) {
-  const { data } = await api.get(`/resume-ranap/auto-fill/${encodeURIComponent(no_rawat)}`);
+  const { data } = await api.get(`/resume-ranap/auto-fill?no_rawat=${encodeURIComponent(no_rawat)}`);
   return data;
 }
 
@@ -392,7 +392,7 @@ export async function signOperasi(no_rawat: string, tanggal: string) {
 }
 
 export async function getOperasiAutoFill(no_rawat: string) {
-  const { data } = await api.get(`/operasi/auto-fill/${encodeURIComponent(no_rawat)}`);
+  const { data } = await api.get(`/operasi/auto-fill?no_rawat=${encodeURIComponent(no_rawat)}`);
   return data;
 }
 

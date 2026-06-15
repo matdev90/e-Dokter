@@ -7,9 +7,10 @@ const router = Router();
 router.get("/search-visit", authenticate, async (req: AuthRequest, res) => {
   try {
     const q = (req.query.q as string) || "";
-    const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit as string) || 10));
-    const offset = (page - 1) * limit;
+    const rawLimit = parseInt(req.query.limit as string);
+    const limit = rawLimit === 0 ? 0 : Math.max(1, Math.min(100, rawLimit || 12));
+    const page = limit > 0 ? Math.max(1, parseInt(req.query.page as string) || 1) : 1;
+    const offset = (page - 1) * Math.max(limit, 1);
     const tgl_from = (req.query.tgl_from as string) || "";
     const tgl_to = (req.query.tgl_to as string) || "";
     const kd_pj = (req.query.kd_pj as string) || "";
@@ -71,9 +72,8 @@ router.get("/search-visit", authenticate, async (req: AuthRequest, res) => {
     );
     const total = (countRows as any[])[0].total;
 
-    const [rows] = await pool.execute(
-      `SELECT rp.no_rawat, rp.tgl_registrasi, rp.jam_reg, rp.no_rkm_medis,
-               p.nm_pasien, p.alamat, d.nm_dokter, rp.kd_poli, rp.status_lanjut,
+    let sql = `SELECT rp.no_rawat, rp.tgl_registrasi, rp.jam_reg, rp.no_rkm_medis,
+               p.nm_pasien, p.alamat, p.jk, d.nm_dokter, rp.kd_poli, rp.status_lanjut,
                rp.stts, rp.status_bayar, pl.nm_poli,
               CASE WHEN res.no_rawat IS NOT NULL THEN 1 ELSE 0 END as has_resume,
               (EXISTS (SELECT 1 FROM operasi WHERE no_rawat = rp.no_rawat)) AS has_operasi,
@@ -86,18 +86,21 @@ router.get("/search-visit", authenticate, async (req: AuthRequest, res) => {
        LEFT JOIN poliklinik pl ON rp.kd_poli = pl.kd_poli
        LEFT JOIN resume_pasien res ON rp.no_rawat = res.no_rawat
        ${whereClause}
-       ORDER BY rp.tgl_registrasi DESC, rp.jam_reg DESC
-       LIMIT ? OFFSET ?`,
-      [...params, String(limit), String(offset)]
-    );
+       ORDER BY rp.tgl_registrasi DESC, rp.jam_reg DESC`;
+    const sqlParams = [...params];
+    if (limit > 0) {
+      sql += ` LIMIT ? OFFSET ?`;
+      sqlParams.push(String(limit), String(offset));
+    }
+    const [rows] = await pool.execute(sql, sqlParams);
 
     return res.json({
       data: rows,
       pagination: {
-        page,
+        page: limit > 0 ? page : 1,
         limit,
         total,
-        totalPages: Math.ceil(total / limit),
+        totalPages: limit > 0 ? Math.ceil(total / limit) : 1,
       },
     });
   } catch (error) {
@@ -258,9 +261,10 @@ router.put("/:no_rawat", authenticate, async (req: AuthRequest, res) => {
   }
 });
 
-router.get("/auto-fill/:no_rawat", authenticate, async (req: AuthRequest, res) => {
+router.get("/auto-fill", authenticate, async (req: AuthRequest, res) => {
   try {
-    const { no_rawat } = req.params;
+    const no_rawat = (req.query.no_rawat || "") as string;
+    if (!no_rawat) return res.status(400).json({ error: "no_rawat required" });
     const result: any = {};
 
     // 1. Keluhan Utama — try penilaian_medis_igd, then penilaian_medis_ralan, then pemeriksaan_ralan
